@@ -15,8 +15,17 @@
    - WhatsApp/SMS/email: worker that consumes unsent notification rows (provider: WATI/Gupshup/Twilio + Resend/SES).
    - PDF generation: server-render the existing print layouts (Playwright/`@react-pdf`).
    - File uploads: S3-compatible storage for EMR records + consent signatures.
-4. **Global search** — the topbar search button is currently decorative; wire a cmdk command
-   palette over patients/appointments/invoices (the `cmdk` dependency is already installed).
+
+## 1b. Done: global search
+
+`Cmd/Ctrl+K` (or the topbar search bar / mobile search icon) opens a command palette
+(`globalSearchAction` in `src/server/actions/search.actions.ts`) that fans out across every
+module the signed-in role may view — patients, appointments, prescriptions, invoices, doctors,
+medicines, consent forms — reusing the exact same scoping the list pages use (doctor → own
+patients/appointments, receptionist → own branch, patient → own records only), and deep-links each
+hit into its role-prefixed route. The palette UI (`cmdk`) is code-split out of the app shell via
+`SearchTrigger` (`next/dynamic`, `ssr:false`) so it only downloads once a user actually opens
+search, not on every one of the ~50 authenticated routes.
 
 ## 2. Near-term product modules (data model ready)
 
@@ -61,3 +70,28 @@ auto-commits to the record.
 - **Compute**: stateless Next.js nodes; notification/PDF workers on a queue (BullMQ/Redis when needed).
 - **Caching**: React `cache()` per request today; Redis for hot lookups (masters, branding) later.
 - **SEO**: marketing site only — the app itself stays behind auth (`noindex`).
+
+## 7. Deployed-app performance notes
+
+Fixed (2026-08-08): `src/server/demo/users-store.ts` seeded its 5 demo accounts by calling
+`scryptSync` (deliberately CPU-heavy, ~50-150ms each) inside a module-scope array initializer.
+Because that module is statically imported by the admin users page and its actions, **every
+serverless cold start** that touched it paid 250-500ms of pure blocking CPU before serving a
+single byte — a direct, measurable contributor to "the app feels slow" on a low-traffic Vercel
+deployment (idle → cold start on next request is the common case). Fixed by precomputing the 5
+hashes once offline and hardcoding them as literals; `hashPassword`/`verifyPassword` (used for
+real new-admin creation and login checks) are untouched and still hash on demand, which is
+correct — only the *seed data* needed to stop being computed at import time.
+
+Also code-split the global-search palette (`cmdk`) out of the shared app shell so it only loads
+on demand (§1b) — confirmed via a production build that the shared baseline JS (102 kB) is
+unaffected by the addition.
+
+**Structural factor outside code-level control**: `appConfig.dataMode = "demo"` keeps all data in
+module-level in-memory arrays. On Vercel's serverless functions this means (a) state does not
+reliably persist across invocations/instances, and (b) every route that touches demo data
+re-evaluates that module on a cold start. Cold starts are the dominant remaining latency source on
+a low-traffic deployment and are inherent to serverless Node functions — not something further
+optimizable in application code short of the MongoDB migration (§1) and/or Vercel's paid
+always-warm ("Fluid compute") tier. If perceived slowness persists after a redeploy, check the
+Vercel dashboard's Function logs for cold-start duration before assuming a code regression.

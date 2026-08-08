@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, LogOut, Menu, Search, UserRound, PanelLeft } from "lucide-react";
+import { Bell, LogOut, Menu, UserRound, PanelLeft } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -20,6 +20,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { SidebarNav } from "./sidebar";
 import { ThemeToggle } from "./theme-toggle";
+import { SearchTrigger } from "./search-trigger";
 import { signOut } from "@/server/actions/session.actions";
 import { initials } from "@/lib/format";
 import { ROLE_LABELS, type Role } from "@/lib/rbac";
@@ -73,18 +74,10 @@ export function Topbar({ name, email, role, branchName, notificationCount = 0, o
         </button>
       )}
 
-      {/* Search */}
-      <div className="hidden flex-1 md:block">
-        <button
-          type="button"
-          className="flex h-9 w-full max-w-md items-center gap-2 rounded-lg border bg-muted/40 px-3 text-sm text-muted-foreground transition-colors hover:bg-muted"
-        >
-          <Search className="size-4" />
-          <span>Search patients, appointments, invoices…</span>
-          <kbd className="ml-auto hidden rounded border bg-background px-1.5 text-[10px] sm:inline">
-            ⌘K
-          </kbd>
-        </button>
+      {/* Search: full bar on desktop, icon-only trigger on mobile (both open the same palette).
+          The palette UI itself (cmdk) is code-split — see SearchTrigger. */}
+      <div className="flex flex-1 items-center md:max-w-md">
+        <SearchTrigger />
       </div>
 
       <div className="ml-auto flex items-center gap-1">

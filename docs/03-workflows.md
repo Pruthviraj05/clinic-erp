@@ -86,6 +86,15 @@ Trigger (booking / low stock / payment / expiry) → notification row (type, cha
 status) → in-app centre per role (mark one/all read). The rows are the queue contract: a future worker
 consumes unsent rows and dispatches to the real WhatsApp/email/SMS providers — no UI change needed.
 
+## 5b. Global search
+
+`Cmd/Ctrl+K` anywhere in the app (or the topbar search bar / mobile search icon) opens a command
+palette. Typing fans a single query out across every module the signed-in role may view —
+patients, appointments, prescriptions, invoices, doctors, medicines, consent forms — using the
+same scoping as the list pages (a doctor only sees their own patients/appointments, a receptionist
+only their branch, a patient only their own records). Selecting a hit deep-links into its
+role-prefixed route (e.g. `/admin/patients/pat_arjun`).
+
 ## 6. Referral workflow (data model ready, UI planned)
 
 Patient carries `referredBy` (doctor / hospital / friend / Google / social / existing patient / corporate).

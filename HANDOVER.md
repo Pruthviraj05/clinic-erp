@@ -171,30 +171,55 @@ referential integrity, formatters.
     (`/reception/consent`); assigned doctor edits (`/doctor/consent`); patient e-signs; signed = locked.
 19. **Tests: 68** (12 files) incl. server-action integration tests that mock `next/headers`.
 
+## 8c. DONE in the third batch (2026-08-08, GitHub + Vercel + perf)
+
+20. **Shipped**: git repo initialized, pushed to `github.com/Pruthviraj05/clinic-erp` (`main`); real
+    `README.md`, `.env.example`, `vercel.json` added. Deployed on Vercel from the GitHub import.
+21. **Global search, live**: `Cmd/Ctrl+K` / topbar bar / mobile icon → command palette
+    (`src/server/actions/search.actions.ts` fans out across patients/appointments/prescriptions/
+    invoices/doctors/medicines/consent, respecting the same per-role scoping as the list pages).
+    UI is `src/components/layout/search-trigger.tsx` (always loaded, cheap) +
+    `global-search-dialog.tsx` (the actual `cmdk` UI, **code-split via `next/dynamic({ssr:false})`**
+    so it only downloads once a user opens search — confirmed via build that shared JS (102 kB)
+    is unaffected).
+22. **Fixed a real cold-start perf bug**: `users-store.ts` ran 5× `scryptSync` (~50-150ms each) inside
+    a module-scope array initializer to seed demo accounts — paid on every serverless cold start of
+    any route that touches it (admin users page + its actions). Replaced with precomputed hash
+    literals; `hashPassword`/`verifyPassword` (used for real hashing on demand) are untouched. See
+    `docs/05-roadmap.md` §7 for the full writeup and what's still structurally slow (serverless cold
+    starts on in-memory demo data — inherent until the MongoDB migration).
+
 ## 9. PENDING / next steps (in priority order)
 
 1. **MongoDB adapter** (user's stated direction): implement `StoragePort` per `src/server/repositories/README.md`,
-   seed from demo data, set `MONGODB_URI` + `NEXT_PUBLIC_DATA_MODE=mongodb`.
+   seed from demo data, set `MONGODB_URI` + `NEXT_PUBLIC_DATA_MODE=mongodb`. Also the best remaining
+   lever on deployed-app latency — see `docs/05-roadmap.md` §7.
 2. **Switch auth on**: set `NEXT_PUBLIC_AUTH_MODE=credentials`, then harden (signed session token
    instead of the role cookie, rate limiting, OTP/Google). Also replace the demo doctor mapping
    (`"doc_mehta"` hardcoded in services/actions) with `user.linkId`.
 3. **Real integrations**: WhatsApp/SMS/email worker over notification rows; server PDF; S3 uploads.
-4. **Global search**: topbar button is decorative — wire a cmdk palette (dependency already installed).
-5. Product roadmap (referrals analytics UI, certificates, follow-up automation, full-UI i18n):
+4. Product roadmap (referrals analytics UI, certificates, follow-up automation, full-UI i18n):
    see `docs/05-roadmap.md`.
 
-## 10. Verification status at handover (2026-08-08)
-- `npm run build` ✓ (~56 routes + middleware, typecheck enforced) · `npx tsc --noEmit` ✓
+## 10. Verification status at handover (2026-08-08, updated)
+- `npm run build` ✓ (52 routes + middleware, typecheck enforced) · `npx tsc --noEmit` ✓
 - `npm test` ✓ 68/68 · `npm run lint` ✓ clean
 - Browser-verified: consult flow end-to-end (queue → template → Save & Complete → print-ready Rx +
   audit row), all admin CRUD surfaces present, mobile 375px (no horizontal overflow on dashboard /
-  consult / prescription). NOTE: the in-app browser pane may report `document.hidden: true` (not
-  compositing) — coordinate clicks/screenshots get flaky; drive interactions via DOM
-  (`javascript_tool`) or `read_page` a11y tree.
+  consult / prescription). Route smoke test (curl w/ role cookie) green across all 4 roles incl. the
+  new search/admins routes.
+- NOTE: the in-app browser pane intermittently reports `document.hidden: true` (not compositing),
+  which blocks Base UI's portal-mount timing for Dialog/DropdownMenu/Sheet overlays specifically —
+  state updates correctly (verified via console) but the overlay never paints in-pane. This is an
+  environment limitation of the preview pane, not a code defect (the same controlled-Dialog pattern
+  is used successfully by ~15 other dialogs already shipped in this app). Verify overlay UI in a real
+  browser, or drive state via `javascript_tool` + check DOM directly rather than relying on
+  `computer` screenshots/clicks for anything that opens a Base UI portal.
 
 ## 11. Handy references
 - Engineering guide: `clinic-erp/AGENTS.md` · Product/tech docs: `clinic-erp/docs/01-05*.md`
 - Domain view-types: `src/types/domain.ts`
 - Storage port + MongoDB guide: `src/server/repositories/` (schema reference: `prisma/schema.prisma`)
 - Demo data (edit to change seed content): `src/server/demo/data.ts`, `extra.ts`, `inventory-store.ts`,
-  `template-store.ts`, `settings-store.ts`
+  `template-store.ts`, `settings-store.ts`, `users-store.ts` (seed password: `Clinic@123`)
+- Repo: `github.com/Pruthviraj05/clinic-erp` (`main`) · Deployed on Vercel from the GitHub import
