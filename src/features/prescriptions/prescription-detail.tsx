@@ -213,6 +213,13 @@ export function PrescriptionDetail({
             </div>
           </div>
 
+          {/* Investigations */}
+          {rx.investigations.length > 0 && (
+            <div className="border-t py-4">
+              <Block title={L("investigations")} text={rx.investigations.join(", ")} />
+            </div>
+          )}
+
           {/* Advice + follow-up */}
           {(rx.advice || rx.followUpDate) && (
             <div className="grid gap-4 border-t py-4 sm:grid-cols-2">

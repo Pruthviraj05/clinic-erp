@@ -102,7 +102,7 @@ export default async function EditPrescriptionPage({ params }: { params: Promise
           notes: "",
           diagnoses: rx.diagnoses,
           medicines: rx.medicines,
-          investigations: [],
+          investigations: rx.investigations,
           advice: rx.advice ? [rx.advice] : [],
           followUpDate: rx.followUpDate ? rx.followUpDate.slice(0, 10) : "",
         }}

@@ -126,6 +126,7 @@ export interface Prescription {
   diagnoses: string[];
   symptoms: string | null;
   medicines: PrescriptionMedicine[];
+  investigations: string[];
   advice: string | null;
   followUpDate: string | null;
   createdAt: string;

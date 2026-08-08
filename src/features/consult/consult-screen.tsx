@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   BookmarkPlus,
-  ChevronDown,
   Eye,
   EyeOff,
   FileText,
@@ -150,7 +149,7 @@ export function ConsultScreen({
   const [followUpDate, setFollowUpDate] = useState<string>(prefill?.followUpDate ?? "");
   const [groups, setGroups] = useState<DiseaseGroupOption[]>(diseaseGroups);
   const [newGroupName, setNewGroupName] = useState("");
-  const [showHistory, setShowHistory] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [letterhead, setLetterhead] = useState(true);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
@@ -171,7 +170,9 @@ export function ConsultScreen({
   function repeatVisit(rx: Prescription) {
     setDiagnoses((d) => [...new Set([...d, ...rx.diagnoses])]);
     setMedicines((m) => [...m, ...rx.medicines.map((x) => ({ ...x }))]);
+    setInvestigations((i) => [...new Set([...i, ...rx.investigations])]);
     if (rx.advice) setAdvice((a) => [...new Set([...a, rx.advice!])]);
+    setHistoryOpen(false);
     toast.success("Previous visit loaded into this prescription");
   }
 
@@ -288,6 +289,15 @@ export function ConsultScreen({
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => setHistoryOpen(true)}>
+            <History className="size-4" />
+            Case History
+            {history.length > 0 && (
+              <span className="ml-1 inline-flex size-5 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
+                {history.length}
+              </span>
+            )}
+          </Button>
           <Button variant="outline" onClick={() => setShowPreview((v) => !v)} className="lg:hidden">
             {showPreview ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             {showPreview ? "Hide preview" : "Preview"}
@@ -298,77 +308,6 @@ export function ConsultScreen({
           </Button>
         </div>
       </div>
-
-      {/* Case history */}
-      {history.length > 0 && (
-        <SectionCard noPadding>
-          <button
-            type="button"
-            className="flex w-full items-center justify-between px-4 py-3 text-left"
-            onClick={() => setShowHistory((v) => !v)}
-          >
-            <span className="flex items-center gap-2 text-sm font-medium">
-              <History className="size-4 text-primary" /> Case history
-              <span className="text-xs font-normal text-muted-foreground">
-                {history.length} previous visit{history.length > 1 ? "s" : ""}
-              </span>
-            </span>
-            <ChevronDown className={cn("size-4 transition-transform", showHistory && "rotate-180")} />
-          </button>
-          {showHistory && (
-            <ul className="border-t">
-              {history.map((rx) => (
-                <li key={rx.id} className="space-y-2 border-b px-4 py-3 last:border-0">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">{rx.diagnoses.join(", ") || "—"}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(rx.createdAt)} · {rx.doctorName}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <Button variant="outline" size="sm" onClick={() => repeatVisit(rx)}>
-                        <RotateCcw className="size-3.5" /> Repeat
-                      </Button>
-                      <Link
-                        href={`/doctor/prescriptions/${rx.id}`}
-                        className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-                      >
-                        <FileText className="size-3.5" /> View
-                      </Link>
-                      <Link
-                        href={`/doctor/prescriptions/${rx.id}/edit`}
-                        className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-                      >
-                        <Pencil className="size-3.5" /> Edit
-                      </Link>
-                    </div>
-                  </div>
-                  {rx.medicines.length > 0 && (
-                    <ul className="space-y-0.5 rounded-md bg-muted/40 p-2 text-xs">
-                      {rx.medicines.map((m, i) => (
-                        <li key={i}>
-                          <span className="font-medium">{m.name}</span>
-                          <span className="text-muted-foreground">
-                            {" "}
-                            {[m.dosage, m.frequency, m.timing, m.durationDays ? `${m.durationDays} days` : null]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {rx.advice ? <p className="text-xs text-muted-foreground">Advice: {rx.advice}</p> : null}
-                  {rx.followUpDate ? (
-                    <p className="text-xs text-muted-foreground">Follow-up was {formatDate(rx.followUpDate)}</p>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
-        </SectionCard>
-      )}
 
       {/* Quick start */}
       <div className="flex flex-wrap items-center gap-2">
@@ -659,11 +598,129 @@ export function ConsultScreen({
           </ul>
         </DialogContent>
       </Dialog>
+
+      {/* Case History — one click from the header, full detail per visit */}
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Case history — {patient.fullName}</DialogTitle>
+            <DialogDescription>
+              {history.length > 0
+                ? `${history.length} previous visit${history.length > 1 ? "s" : ""}, most recent first.`
+                : "No previous visits recorded for this patient yet."}
+            </DialogDescription>
+          </DialogHeader>
+          {history.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-10 text-center text-sm text-muted-foreground">
+              <History className="size-8 text-muted-foreground/50" />
+              This is the first recorded visit — nothing to repeat yet.
+            </div>
+          ) : (
+            <ul className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+              {history.map((rx) => (
+                <li key={rx.id} className="space-y-2.5 rounded-lg border p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">{rx.diagnoses.join(", ") || "No diagnosis recorded"}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(rx.createdAt)} · {rx.doctorName}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Button variant="outline" size="sm" onClick={() => repeatVisit(rx)}>
+                        <RotateCcw className="size-3.5" /> Repeat
+                      </Button>
+                      <Link
+                        href={`/doctor/prescriptions/${rx.id}`}
+                        className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+                        onClick={() => setHistoryOpen(false)}
+                      >
+                        <FileText className="size-3.5" /> View
+                      </Link>
+                      <Link
+                        href={`/doctor/prescriptions/${rx.id}/edit`}
+                        className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+                        onClick={() => setHistoryOpen(false)}
+                      >
+                        <Pencil className="size-3.5" /> Edit
+                      </Link>
+                    </div>
+                  </div>
+
+                  {formatVitals(rx.vitals) && (
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">Vitals: </span>
+                      {formatVitals(rx.vitals)}
+                    </p>
+                  )}
+
+                  {rx.symptoms && (
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">Complaints: </span>
+                      {rx.symptoms}
+                    </p>
+                  )}
+
+                  {rx.medicines.length > 0 && (
+                    <ul className="space-y-0.5 rounded-md bg-muted/40 p-2 text-xs">
+                      {rx.medicines.map((m, i) => (
+                        <li key={i}>
+                          <span className="font-medium">{m.name}</span>
+                          <span className="text-muted-foreground">
+                            {" "}
+                            {[m.dosage, m.frequency, m.timing, m.durationDays ? `${m.durationDays} days` : null]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {rx.investigations.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">Investigations: </span>
+                      {rx.investigations.join(", ")}
+                    </p>
+                  )}
+
+                  {rx.advice && (
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">Advice: </span>
+                      {rx.advice}
+                    </p>
+                  )}
+
+                  {rx.followUpDate && (
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">Follow-up was: </span>
+                      {formatDate(rx.followUpDate)}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 /* ------------------------------------------------------------------------- */
+
+function formatVitals(vitals: Prescription["vitals"]): string | null {
+  if (!vitals) return null;
+  const bits = [
+    vitals.bp && `BP ${vitals.bp}`,
+    vitals.pulse ? `Pulse ${vitals.pulse}` : null,
+    vitals.weightKg ? `Wt ${vitals.weightKg} kg` : null,
+    vitals.heightCm ? `Ht ${vitals.heightCm} cm` : null,
+    vitals.tempC ? `Temp ${vitals.tempC}°C` : null,
+    vitals.spo2 ? `SpO₂ ${vitals.spo2}%` : null,
+  ].filter(Boolean);
+  return bits.length ? bits.join(" · ") : null;
+}
 
 function MedicineRow({
   med,

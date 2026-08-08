@@ -83,6 +83,7 @@ export async function createPrescriptionAction(
     diagnoses: input.diagnoses,
     symptoms: [input.complaints.join(", "), input.notes?.trim()].filter(Boolean).join(". ") || null,
     medicines: input.medicines,
+    investigations: input.investigations,
     advice: input.advice.join(" ") || null,
     followUpDate: followUpIso,
     createdAt: now,
@@ -151,6 +152,7 @@ export async function updatePrescriptionAction(
   rx.diagnoses = input.diagnoses;
   rx.symptoms = [input.complaints.join(", "), input.notes?.trim()].filter(Boolean).join(". ") || null;
   rx.medicines = input.medicines;
+  rx.investigations = input.investigations;
   rx.advice = input.advice.join(" ") || null;
   rx.followUpDate = input.followUpDate ? new Date(`${input.followUpDate}T09:00`).toISOString() : null;
   if (input.vitals && Object.keys(input.vitals).length) rx.vitals = input.vitals;
