@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireRole } from "@/lib/guard";
+import { can } from "@/lib/rbac";
 import { getPatientBundle } from "@/server/services/patients.service";
 import { PatientProfile } from "@/features/patients/patient-profile";
 import { generateQrDataUrl } from "@/lib/qr";
@@ -10,7 +11,7 @@ import { generateQrDataUrl } from "@/lib/qr";
 export const metadata: Metadata = { title: "Patient" };
 
 export default async function DoctorPatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireRole("DOCTOR");
+  const { user } = await requireRole("DOCTOR");
   const { id } = await params;
   const bundle = await getPatientBundle(id);
   if (!bundle) notFound();
@@ -20,7 +21,7 @@ export default async function DoctorPatientDetailPage({ params }: { params: Prom
       <Link href="/doctor/patients" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="size-4" /> Back to patients
       </Link>
-      <PatientProfile bundle={bundle} qrDataUrl={qrDataUrl} />
+      <PatientProfile bundle={bundle} qrDataUrl={qrDataUrl} canAddRecord={can(user.role, "emr", "create")} />
     </div>
   );
 }

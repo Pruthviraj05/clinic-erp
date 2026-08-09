@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { FilePlus2, Loader2 } from "lucide-react";
+import { FilePlus2, Loader2, FileText, FolderHeart, History } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -15,8 +15,10 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { createConsentAction, updateConsentAction } from "@/server/actions/consent.actions";
+import { formatDate } from "@/lib/format";
 import type { ActionResult } from "@/server/actions/appointment.actions";
 import type { ConsentFormItem } from "@/server/demo/extra";
+import type { PatientHistoryEntry } from "./consent-view";
 
 export interface ConsentRefOption {
   id: string;
@@ -50,6 +52,7 @@ export function ConsentFormDialog({
   patients,
   doctors,
   form,
+  history,
   open,
   onOpenChange,
 }: {
@@ -57,6 +60,8 @@ export function ConsentFormDialog({
   doctors: ConsentRefOption[];
   /** Present = edit mode (patient is fixed). */
   form?: ConsentFormItem;
+  /** The patient's previous prescriptions + records, shown for context while editing. */
+  history?: PatientHistoryEntry;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
@@ -106,6 +111,51 @@ export function ConsentFormDialog({
               : "Fill the details and assign the doctor this consent concerns."}
           </DialogDescription>
         </DialogHeader>
+
+        {isEdit && history && (history.prescriptions.length > 0 || history.records.length > 0) && (
+          <div className="grid gap-3 rounded-lg border bg-muted/30 p-3 sm:grid-cols-2">
+            <div>
+              <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <History className="size-3.5" /> Previous prescriptions
+              </p>
+              {history.prescriptions.length ? (
+                <ul className="max-h-32 space-y-1.5 overflow-y-auto pr-1 scrollbar-thin">
+                  {history.prescriptions.map((rx) => (
+                    <li key={rx.id} className="flex items-start gap-1.5 text-xs">
+                      <FileText className="mt-0.5 size-3 shrink-0 text-muted-foreground" />
+                      <span>
+                        <span className="font-medium">{rx.diagnoses.join(", ") || "No diagnosis"}</span>
+                        <span className="text-muted-foreground"> · {formatDate(rx.createdAt)}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-muted-foreground">None yet.</p>
+              )}
+            </div>
+            <div>
+              <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <FolderHeart className="size-3.5" /> Medical records
+              </p>
+              {history.records.length ? (
+                <ul className="max-h-32 space-y-1.5 overflow-y-auto pr-1 scrollbar-thin">
+                  {history.records.map((r) => (
+                    <li key={r.id} className="flex items-start gap-1.5 text-xs">
+                      <FolderHeart className="mt-0.5 size-3 shrink-0 text-muted-foreground" />
+                      <span>
+                        <span className="font-medium">{r.title}</span>
+                        <span className="text-muted-foreground"> · {r.category} · {formatDate(r.recordedAt)}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-muted-foreground">None yet.</p>
+              )}
+            </div>
+          </div>
+        )}
 
         <form ref={formRef} action={formAction} className="grid gap-4">
           {isEdit ? (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { FileSignature, Loader2, CheckCircle2, Pencil, Stethoscope } from "lucide-react";
+import { FileSignature, Loader2, CheckCircle2, Pencil, Stethoscope, FilePlus2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -18,23 +18,37 @@ import { SignaturePad } from "@/components/shared/signature-pad";
 import { EmptyState } from "@/components/shared/empty-state";
 import { signConsentAction } from "@/server/actions/consent.actions";
 import { ConsentFormDialog, type ConsentRefOption } from "./consent-form-dialog";
+import { AddMedicalRecordDialog } from "@/features/records/medical-record-dialog";
 import { formatDate } from "@/lib/format";
-import type { ConsentFormItem } from "@/server/demo/extra";
+import type { ConsentFormItem, MedicalRecordItem } from "@/server/demo/extra";
+import type { Prescription } from "@/types/domain";
+
+export interface PatientHistoryEntry {
+  prescriptions: Prescription[];
+  records: MedicalRecordItem[];
+}
 
 export function ConsentView({
   forms,
   canSign = false,
   canEdit = false,
   doctors = [],
+  patientHistory,
+  canAddRecords = false,
 }: {
   forms: ConsentFormItem[];
   canSign?: boolean;
   /** Reception + the assigned doctor may edit an unsigned form. */
   canEdit?: boolean;
   doctors?: ConsentRefOption[];
+  /** Keyed by patientId — previous prescriptions + records, shown while editing a form. */
+  patientHistory?: Record<string, PatientHistoryEntry>;
+  /** Doctor viewing this screen may add a medical record for the patient. */
+  canAddRecords?: boolean;
 }) {
   const [active, setActive] = useState<ConsentFormItem | null>(null);
   const [editing, setEditing] = useState<ConsentFormItem | null>(null);
+  const [addingRecordFor, setAddingRecordFor] = useState<ConsentFormItem | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -95,6 +109,11 @@ export function ConsentView({
                 )}
               </div>
               <div className="flex items-center gap-2">
+                {canAddRecords && (
+                  <Button variant="outline" size="sm" onClick={() => setAddingRecordFor(f)}>
+                    <FilePlus2 className="size-3.5" /> Add record
+                  </Button>
+                )}
                 {canEdit && f.status !== "SIGNED" && (
                   <Button variant="outline" size="sm" onClick={() => setEditing(f)}>
                     <Pencil className="size-3.5" /> Edit
@@ -118,8 +137,17 @@ export function ConsentView({
         <ConsentFormDialog
           form={editing}
           doctors={doctors}
+          history={patientHistory?.[editing.patientId]}
           open
           onOpenChange={(o) => { if (!o) setEditing(null); }}
+        />
+      )}
+
+      {addingRecordFor && (
+        <AddMedicalRecordDialog
+          patientId={addingRecordFor.patientId}
+          open
+          onOpenChange={(o) => { if (!o) setAddingRecordFor(null); }}
         />
       )}
 

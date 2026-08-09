@@ -18,6 +18,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { formatAge, formatCurrency, formatDate, formatDateTime, humanizeEnum, initials } from "@/lib/format";
+import { AddMedicalRecordDialog } from "@/features/records/medical-record-dialog";
 import type { PatientBundle } from "@/server/services/patients.service";
 
 type TimelineEvent = {
@@ -69,7 +70,16 @@ const EVENT_ICON = {
   record: FolderHeart,
 };
 
-export function PatientProfile({ bundle, qrDataUrl }: { bundle: PatientBundle; qrDataUrl?: string }) {
+export function PatientProfile({
+  bundle,
+  qrDataUrl,
+  canAddRecord = false,
+}: {
+  bundle: PatientBundle;
+  qrDataUrl?: string;
+  /** Doctor/staff viewing this profile may add a medical record for this patient. */
+  canAddRecord?: boolean;
+}) {
   const { patient, appointments, prescriptions, invoices, records } = bundle;
   const timeline = buildTimeline(bundle);
   const outstanding = invoices.reduce((s, i) => s + i.balanceAmount, 0);
@@ -207,7 +217,12 @@ export function PatientProfile({ bundle, qrDataUrl }: { bundle: PatientBundle; q
         </TabsContent>
 
         {/* Records */}
-        <TabsContent value="records" className="mt-4">
+        <TabsContent value="records" className="mt-4 space-y-3">
+          {canAddRecord && (
+            <div className="flex justify-end">
+              <AddMedicalRecordDialog patientId={patient.id} triggerLabel="Add record" />
+            </div>
+          )}
           <SectionCard noPadding>
             {records.length ? (
               <div className="divide-y">
@@ -219,6 +234,8 @@ export function PatientProfile({ bundle, qrDataUrl }: { bundle: PatientBundle; q
                     <div className="flex-1">
                       <p className="text-sm font-medium">{r.title}</p>
                       <p className="text-xs text-muted-foreground">{r.category} · {r.fileType} · {r.fileSize}</p>
+                      {r.notes ? <p className="mt-0.5 text-xs text-muted-foreground">{r.notes}</p> : null}
+                      {r.addedBy ? <p className="mt-0.5 text-[11px] text-muted-foreground/70">Added by {r.addedBy}</p> : null}
                     </div>
                     <span className="text-xs text-muted-foreground">{formatDate(r.recordedAt)}</span>
                   </div>

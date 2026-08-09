@@ -15,7 +15,7 @@ export default async function PortalRecordsPage() {
   return (
     <div>
       <PageHeader title="Medical records" description="Your lab reports, scans and documents." />
-      <RecordsView records={records} />
+      <RecordsView records={records} patientId={user.linkId ?? ""} />
     </div>
   );
 }

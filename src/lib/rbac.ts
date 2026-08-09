@@ -140,7 +140,7 @@ export const PERMISSIONS: Record<Role, Partial<Record<Module, PermissionAction[]
     dashboard: READ,
     appointments: ["view", "create"],
     prescriptions: READ_PRINT,
-    emr: READ_PRINT,
+    emr: ["view", "create", "print"],
     billing: READ_PRINT,
     consent: ["view", "create", "print"],
     notifications: READ,

@@ -16,6 +16,12 @@ export interface MedicalRecordItem {
   fileType: string;
   fileSize: string;
   recordedAt: string;
+  /** Optional context — reason for the record, findings, etc. */
+  notes?: string;
+  /** Optional attached file as a base64 data URL (no object-storage backend yet). */
+  fileDataUrl?: string;
+  /** Who added it and from which role, e.g. "Dr. Abhijeet Bhosikar (Doctor)" or "Sunita Deshmukh (Patient)". */
+  addedBy?: string;
 }
 
 export const medicalRecords: MedicalRecordItem[] = [];
