@@ -71,7 +71,7 @@ async function main() {
       id: "doc_bhosikar",
       userId: "usr_doc_bhosikar",
       fullName: "Dr. Abhijeet Bhosikar",
-      email: "doctor@bhosikarrheumatology.in",
+      email: "doctor@gmail.com",
       specialization: "Rheumatology",
       department: "Rheumatology — Joint & Back Pain",
       registrationNo: null,

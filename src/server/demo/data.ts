@@ -53,7 +53,7 @@ export const doctors: Doctor[] = [
     id: "doc_bhosikar",
     userId: "usr_doc_bhosikar",
     fullName: "Dr. Abhijeet Bhosikar",
-    email: "doctor@bhosikarrheumatology.in", // PLACEHOLDER — confirm real email
+    email: "doctor@gmail.com", // PLACEHOLDER — confirm real email
     specialization: "Rheumatology",
     department: "Rheumatology — Joint & Back Pain",
     registrationNo: null, // PLACEHOLDER — add Maharashtra Medical Council registration number
@@ -158,7 +158,7 @@ const DEMO_USERS: Record<Role, SessionUser> = {
   DOCTOR: {
     id: "usr_doc_bhosikar",
     fullName: "Dr. Abhijeet Bhosikar",
-    email: "doctor@bhosikarrheumatology.in",
+    email: "doctor@gmail.com",
     role: "DOCTOR",
     organizationId: DEMO_ORG_ID,
     branchId: "br_ravet",
@@ -168,7 +168,7 @@ const DEMO_USERS: Record<Role, SessionUser> = {
   RECEPTIONIST: {
     id: "usr_rec_demo",
     fullName: "Reception (demo)",
-    email: "reception@bhosikarrheumatology.in",
+    email: "reception@gmail.com",
     role: "RECEPTIONIST",
     organizationId: DEMO_ORG_ID,
     branchId: "br_ravet",

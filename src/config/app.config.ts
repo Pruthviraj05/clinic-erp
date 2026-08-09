@@ -20,7 +20,7 @@ export const appConfig = {
   defaultLocale: "en-IN",
   defaultTimezone: "Asia/Kolkata",
   support: {
-    email: "doctor@bhosikarrheumatology.in", // PLACEHOLDER — confirm real support contact
+    email: "doctor@gmail.com", // PLACEHOLDER — confirm real support contact
   },
 } as const;
 
