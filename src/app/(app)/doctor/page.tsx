@@ -18,6 +18,8 @@ export default async function DoctorDashboardPage() {
   const current = mine.find((a) => a.status === "IN_PROGRESS");
   const completed = mine.filter((a) => a.status === "COMPLETED").length;
   const waiting = mine.filter((a) => ["CHECKED_IN", "CONFIRMED", "SCHEDULED"].includes(a.status)).length;
+  const followUpCount = mine.filter((a) => a.type === "FOLLOW_UP").length;
+  const newCount = mine.length - followUpCount;
 
   return (
     <div className="space-y-6">
@@ -27,7 +29,16 @@ export default async function DoctorDashboardPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Today's appointments" value={mine.length} icon={CalendarDays} accent="primary" />
+        <StatCard
+          label="Today's appointments"
+          value={mine.length}
+          icon={CalendarDays}
+          accent="primary"
+          breakdown={[
+            { label: "New", value: newCount },
+            { label: "Follow-up", value: followUpCount },
+          ]}
+        />
         <StatCard label="Waiting in queue" value={waiting} icon={Clock} accent="warning" />
         <StatCard label="Completed" value={completed} icon={CheckCircle2} accent="success" />
         <StatCard label="Follow-ups due" value={d.pendingFollowUps.length} icon={CalendarClock} accent="info" />

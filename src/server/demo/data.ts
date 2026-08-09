@@ -30,6 +30,26 @@ import type { SessionUser } from "@/lib/session";
 export const DEMO_ORG_ID = "org_bhosikar_rheumatology";
 
 // ---------------------------------------------------------------------------
+// Date helpers (relative to now, so sample records always look current)
+// ---------------------------------------------------------------------------
+function atToday(hour: number, minute = 0): string {
+  const d = new Date();
+  d.setHours(hour, minute, 0, 0);
+  return d.toISOString();
+}
+function daysFromNow(days: number, hour = 10, minute = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  d.setHours(hour, minute, 0, 0);
+  return d.toISOString();
+}
+function yearsAgo(years: number): string {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - years);
+  return d.toISOString();
+}
+
+// ---------------------------------------------------------------------------
 // Branches — single real clinic
 // ---------------------------------------------------------------------------
 export const branches: Branch[] = [
@@ -70,10 +90,11 @@ export const doctors: Doctor[] = [
 export const receptionists: Receptionist[] = [];
 
 // ---------------------------------------------------------------------------
-// Patients — clean slate; real patients are registered via reception/portal.
-// One clearly-labeled demo patient is seeded so the hidden dev-only demo
-// login for the PATIENT role has something to resolve against. It only
-// exists in this in-memory demo array (dataMode="demo"), never in MongoDB.
+// Patients — 3 sample patients with a plausible rheumatology history, for
+// walkthroughs/training/help. Clearly fake, distinct from real registrations
+// (which admins/reception create via the UI). Plus one demo-login patient
+// the hidden PATIENT dev-fallback resolves against. None of this exists in
+// MongoDB — mirrored there by scripts/seed-mongodb.mjs, kept in sync.
 // ---------------------------------------------------------------------------
 export const patients: Patient[] = [
   {
@@ -94,22 +115,277 @@ export const patients: Patient[] = [
     lastVisitAt: null,
     isActive: true,
   },
+  {
+    id: "pat_seed_1",
+    mrn: "MRN-100234",
+    firstName: "Sunita",
+    lastName: "Deshmukh",
+    fullName: "Sunita Deshmukh",
+    gender: "FEMALE",
+    dateOfBirth: yearsAgo(52),
+    bloodGroup: "B+",
+    phone: "+91 98230 11223",
+    email: "sunita.deshmukh@example.com",
+    city: "Pune",
+    allergies: "None known",
+    chronicDiseases: "Rheumatoid arthritis (diagnosed 2021)",
+    createdAt: daysFromNow(-240),
+    lastVisitAt: daysFromNow(-30),
+    isActive: true,
+  },
+  {
+    id: "pat_seed_2",
+    mrn: "MRN-100235",
+    firstName: "Ramesh",
+    lastName: "Kulkarni",
+    fullName: "Ramesh Kulkarni",
+    gender: "MALE",
+    dateOfBirth: yearsAgo(45),
+    bloodGroup: "O+",
+    phone: "+91 98220 44556",
+    email: "ramesh.kulkarni@example.com",
+    city: "Pune",
+    allergies: "None known",
+    chronicDiseases: "Recurrent gout",
+    createdAt: daysFromNow(-95),
+    lastVisitAt: daysFromNow(-10),
+    isActive: true,
+  },
+  {
+    id: "pat_seed_3",
+    mrn: "MRN-100236",
+    firstName: "Anjali",
+    lastName: "Joshi",
+    fullName: "Anjali Joshi",
+    gender: "FEMALE",
+    dateOfBirth: yearsAgo(38),
+    bloodGroup: "A+",
+    phone: "+91 98901 77889",
+    email: "anjali.joshi@example.com",
+    city: "Pimpri-Chinchwad",
+    allergies: "Sulfa drugs",
+    chronicDiseases: null,
+    createdAt: daysFromNow(-45),
+    lastVisitAt: daysFromNow(-45),
+    isActive: true,
+  },
 ];
 
 // ---------------------------------------------------------------------------
-// Appointments — clean slate
+// Appointments — history for the 3 sample patients, plus two on today's list
+// so the dashboard/queue widgets have something to show.
 // ---------------------------------------------------------------------------
-export const appointments: Appointment[] = [];
+const CLINIC_NAME = "Dr. Bhosikar's Rheumatology Clinic";
+const DOCTOR_NAME = "Dr. Abhijeet Bhosikar";
+
+export const appointments: Appointment[] = [
+  {
+    id: "apt_seed_1",
+    branchId: "br_ravet",
+    branchName: CLINIC_NAME,
+    patientId: "pat_seed_1",
+    patientName: "Sunita Deshmukh",
+    patientMrn: "MRN-100234",
+    doctorId: "doc_bhosikar",
+    doctorName: DOCTOR_NAME,
+    type: "FOLLOW_UP",
+    status: "COMPLETED",
+    scheduledStart: daysFromNow(-30, 11, 0),
+    scheduledEnd: daysFromNow(-30, 11, 20),
+    tokenNumber: 4,
+    reason: "RA follow-up — joint pain review",
+    paymentStatus: "PAID",
+  },
+  {
+    id: "apt_seed_2",
+    branchId: "br_ravet",
+    branchName: CLINIC_NAME,
+    patientId: "pat_seed_1",
+    patientName: "Sunita Deshmukh",
+    patientMrn: "MRN-100234",
+    doctorId: "doc_bhosikar",
+    doctorName: DOCTOR_NAME,
+    type: "FOLLOW_UP",
+    status: "CONFIRMED",
+    scheduledStart: atToday(11, 0),
+    scheduledEnd: atToday(11, 20),
+    tokenNumber: 1,
+    reason: "RA follow-up — methotrexate response check",
+    paymentStatus: "UNPAID",
+  },
+  {
+    id: "apt_seed_3",
+    branchId: "br_ravet",
+    branchName: CLINIC_NAME,
+    patientId: "pat_seed_2",
+    patientName: "Ramesh Kulkarni",
+    patientMrn: "MRN-100235",
+    doctorId: "doc_bhosikar",
+    doctorName: DOCTOR_NAME,
+    type: "WALK_IN",
+    status: "COMPLETED",
+    scheduledStart: daysFromNow(-10, 16, 30),
+    scheduledEnd: daysFromNow(-10, 16, 50),
+    tokenNumber: 7,
+    reason: "Acute gout attack — right great toe",
+    paymentStatus: "PAID",
+  },
+  {
+    id: "apt_seed_4",
+    branchId: "br_ravet",
+    branchName: CLINIC_NAME,
+    patientId: "pat_seed_3",
+    patientName: "Anjali Joshi",
+    patientMrn: "MRN-100236",
+    doctorId: "doc_bhosikar",
+    doctorName: DOCTOR_NAME,
+    type: "SCHEDULED",
+    status: "COMPLETED",
+    scheduledStart: daysFromNow(-45, 10, 0),
+    scheduledEnd: daysFromNow(-45, 10, 20),
+    tokenNumber: 2,
+    reason: "Chronic low back pain — initial consult",
+    paymentStatus: "PAID",
+  },
+  {
+    id: "apt_seed_5",
+    branchId: "br_ravet",
+    branchName: CLINIC_NAME,
+    patientId: "pat_seed_3",
+    patientName: "Anjali Joshi",
+    patientMrn: "MRN-100236",
+    doctorId: "doc_bhosikar",
+    doctorName: DOCTOR_NAME,
+    type: "SCHEDULED",
+    status: "SCHEDULED",
+    scheduledStart: atToday(15, 30),
+    scheduledEnd: atToday(15, 50),
+    tokenNumber: 2,
+    reason: "Low back pain — review after exercise plan",
+    paymentStatus: "UNPAID",
+  },
+];
 
 // ---------------------------------------------------------------------------
-// Prescriptions — clean slate
+// Prescriptions — one per sample patient, from their completed visit
 // ---------------------------------------------------------------------------
-export const prescriptions: Prescription[] = [];
+export const prescriptions: Prescription[] = [
+  {
+    id: "rx_seed_1",
+    patientId: "pat_seed_1",
+    patientName: "Sunita Deshmukh",
+    doctorId: "doc_bhosikar",
+    doctorName: DOCTOR_NAME,
+    branchId: "br_ravet",
+    diagnoses: ["Rheumatoid arthritis (M06.9)"],
+    symptoms: "Bilateral hand and wrist joint pain and morning stiffness lasting over an hour.",
+    medicines: [
+      { name: "Methotrexate 7.5mg", dosage: "1 tablet", frequency: "Weekly", timing: "After food", durationDays: 28, instructions: "Once weekly only — same day each week; take with Folic acid" },
+      { name: "Folic Acid 5mg", dosage: "1 tablet", frequency: "Weekly", timing: null, durationDays: 28, instructions: "Take on a different day than Methotrexate" },
+      { name: "Etoricoxib 90mg", dosage: "1 tablet", frequency: "1-0-0", timing: "After food", durationDays: 7, instructions: "Short course for flare pain" },
+    ],
+    investigations: ["CBC", "Liver Function Test", "ESR", "CRP"],
+    advice: "Joint protection techniques; gentle range-of-motion exercises; avoid high-impact activity during flare.",
+    followUpDate: daysFromNow(2),
+    createdAt: daysFromNow(-30, 11, 20),
+    vitals: { heightCm: 158, weightKg: 64, bp: "128/82", pulse: 78, tempC: 36.8, spo2: 98 },
+  },
+  {
+    id: "rx_seed_2",
+    patientId: "pat_seed_2",
+    patientName: "Ramesh Kulkarni",
+    doctorId: "doc_bhosikar",
+    doctorName: DOCTOR_NAME,
+    branchId: "br_ravet",
+    diagnoses: ["Gout, unspecified (M10.9)"],
+    symptoms: "Sudden onset severe pain, redness and swelling of the right great toe overnight.",
+    medicines: [
+      { name: "Colchicine 0.5mg", dosage: "1 tablet", frequency: "1-0-1", timing: "After food", durationDays: 3, instructions: "Reduce dose if GI upset" },
+      { name: "Etoricoxib 90mg", dosage: "1 tablet", frequency: "1-0-0", timing: "After food", durationDays: 5, instructions: null },
+    ],
+    investigations: ["Serum uric acid", "Renal function test"],
+    advice: "Avoid alcohol, red meat, organ meats and sugary drinks during the attack; increase water intake; rest and elevate the affected joint.",
+    followUpDate: daysFromNow(4),
+    createdAt: daysFromNow(-10, 16, 50),
+    vitals: { heightCm: 172, weightKg: 81, bp: "134/86", pulse: 82, tempC: 37.1, spo2: 98 },
+  },
+  {
+    id: "rx_seed_3",
+    patientId: "pat_seed_3",
+    patientName: "Anjali Joshi",
+    doctorId: "doc_bhosikar",
+    doctorName: DOCTOR_NAME,
+    branchId: "br_ravet",
+    diagnoses: ["Low back pain (M54.5)"],
+    symptoms: "Dull aching low back pain for 3 weeks, worse on prolonged sitting, no radiation to legs.",
+    medicines: [
+      { name: "Aceclofenac 100mg + Paracetamol 325mg", dosage: "1 tablet", frequency: "1-0-1", timing: "After food", durationDays: 7, instructions: null },
+      { name: "Thiocolchicoside 4mg", dosage: "1 tablet", frequency: "0-0-1", timing: "At night", durationDays: 5, instructions: "Muscle relaxant" },
+    ],
+    investigations: ["X-ray LS spine if not improving in 2 weeks"],
+    advice: "Avoid heavy lifting and prolonged sitting; hot fomentation twice daily; core-strengthening exercises once acute pain settles.",
+    followUpDate: atToday(15, 30),
+    createdAt: daysFromNow(-45, 10, 20),
+    vitals: { heightCm: 162, weightKg: 58, bp: "118/76", pulse: 72, tempC: 36.7, spo2: 99 },
+  },
+];
 
 // ---------------------------------------------------------------------------
-// Invoices — clean slate
+// Invoices — one per sample patient's completed visit
 // ---------------------------------------------------------------------------
-export const invoices: Invoice[] = [];
+export const invoices: Invoice[] = [
+  {
+    id: "inv_seed_1",
+    number: "INV-1001",
+    branchId: "br_ravet",
+    patientId: "pat_seed_1",
+    patientName: "Sunita Deshmukh",
+    status: "PAID",
+    paymentStatus: "PAID",
+    items: [{ description: "Consultation — Rheumatology follow-up", quantity: 1, unitPrice: 800, lineTotal: 800 }],
+    subtotal: 800,
+    discountAmount: 0,
+    taxAmount: 0,
+    totalAmount: 800,
+    paidAmount: 800,
+    balanceAmount: 0,
+    createdAt: daysFromNow(-30, 11, 25),
+  },
+  {
+    id: "inv_seed_2",
+    number: "INV-1002",
+    branchId: "br_ravet",
+    patientId: "pat_seed_2",
+    patientName: "Ramesh Kulkarni",
+    status: "PAID",
+    paymentStatus: "PAID",
+    items: [{ description: "Consultation — Walk-in (acute gout)", quantity: 1, unitPrice: 800, lineTotal: 800 }],
+    subtotal: 800,
+    discountAmount: 0,
+    taxAmount: 0,
+    totalAmount: 800,
+    paidAmount: 800,
+    balanceAmount: 0,
+    createdAt: daysFromNow(-10, 16, 55),
+  },
+  {
+    id: "inv_seed_3",
+    number: "INV-1003",
+    branchId: "br_ravet",
+    patientId: "pat_seed_3",
+    patientName: "Anjali Joshi",
+    status: "PARTIALLY_PAID",
+    paymentStatus: "PARTIAL",
+    items: [{ description: "Consultation — Initial visit", quantity: 1, unitPrice: 800, lineTotal: 800 }],
+    subtotal: 800,
+    discountAmount: 0,
+    taxAmount: 0,
+    totalAmount: 800,
+    paidAmount: 400,
+    balanceAmount: 400,
+    createdAt: daysFromNow(-45, 10, 25),
+  },
+];
 
 // ---------------------------------------------------------------------------
 // Medicines — rheumatology-focused formulary

@@ -40,12 +40,12 @@ export function DateNavigator({
   const isToday = value === todayYmd();
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
-      <div className="flex items-center rounded-lg border">
+    <div className={cn("flex shrink-0 flex-nowrap items-center gap-2", className)}>
+      <div className="flex h-9 items-center rounded-lg border">
         <Button
           variant="ghost"
-          size="icon-sm"
-          className="rounded-r-none"
+          size="icon-lg"
+          className="h-9 rounded-r-none"
           aria-label="Previous day"
           disabled={!value}
           onClick={() => shift(-1)}
@@ -58,13 +58,13 @@ export function DateNavigator({
             type="date"
             value={value ?? ""}
             onChange={(e) => onChange(e.target.value || null)}
-            className="h-7 w-[150px] bg-transparent pl-8 pr-2 text-sm outline-none"
+            className="h-9 w-[150px] bg-transparent pl-8 pr-2 text-sm outline-none"
           />
         </label>
         <Button
           variant="ghost"
-          size="icon-sm"
-          className="rounded-l-none"
+          size="icon-lg"
+          className="h-9 rounded-l-none"
           aria-label="Next day"
           disabled={!value}
           onClick={() => shift(1)}
@@ -74,14 +74,16 @@ export function DateNavigator({
       </div>
       <Button
         variant={isToday ? "secondary" : "outline"}
-        size="sm"
+        size="lg"
+        className="h-9"
         onClick={() => onChange(todayYmd())}
       >
         Today
       </Button>
       <Button
         variant={value === null ? "secondary" : "outline"}
-        size="sm"
+        size="lg"
+        className="h-9"
         onClick={() => onChange(null)}
       >
         All

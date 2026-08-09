@@ -11,7 +11,12 @@ export default async function AdminDoctorsPage() {
   const session = await requireRole("ADMIN");
   const role = session.user.role;
 
-  const [branches, doctors] = await Promise.all([db.branches.list(), db.doctors.list()]);
+  const [branches, doctors, specializations, departments] = await Promise.all([
+    db.branches.list(),
+    db.doctors.list(),
+    db.masters.specializations.list((s) => s.active),
+    db.masters.departments.list((d) => d.active),
+  ]);
   const branchNames = Object.fromEntries(branches.map((b) => [b.id, b.name]));
   const branchOptions = branches
     .filter((b) => b.isActive)
@@ -24,6 +29,8 @@ export default async function AdminDoctorsPage() {
         doctors={doctors}
         branchNames={branchNames}
         branchOptions={branchOptions}
+        specializationOptions={specializations.map((s) => s.name)}
+        departmentOptions={departments.map((d) => d.name)}
         canCreate={can(role, "doctors", "create")}
         canEdit={can(role, "doctors", "edit")}
         canDelete={can(role, "doctors", "delete")}

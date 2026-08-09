@@ -29,11 +29,15 @@ export interface BranchOption {
 export function DoctorDialog({
   doctor,
   branchOptions,
+  specializationOptions = [],
+  departmentOptions = [],
   open: controlledOpen,
   onOpenChange,
 }: {
   doctor?: Doctor;
   branchOptions: BranchOption[];
+  specializationOptions?: string[];
+  departmentOptions?: string[];
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
@@ -90,11 +94,34 @@ export function DoctorDialog({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="doctor-specialization">Specialization</Label>
-              <input id="doctor-specialization" name="specialization" defaultValue={doctor?.specialization ?? ""} className={fieldClass} placeholder="e.g. Cardiology" />
+              <input
+                id="doctor-specialization"
+                name="specialization"
+                list="doctor-specialization-options"
+                defaultValue={doctor?.specialization ?? ""}
+                className={fieldClass}
+                placeholder="e.g. Rheumatology"
+              />
+              <datalist id="doctor-specialization-options">
+                {specializationOptions.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="doctor-department">Department</Label>
-              <input id="doctor-department" name="department" defaultValue={doctor?.department ?? ""} className={fieldClass} />
+              <input
+                id="doctor-department"
+                name="department"
+                list="doctor-department-options"
+                defaultValue={doctor?.department ?? ""}
+                className={fieldClass}
+              />
+              <datalist id="doctor-department-options">
+                {departmentOptions.map((d) => (
+                  <option key={d} value={d} />
+                ))}
+              </datalist>
             </div>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

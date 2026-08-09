@@ -233,12 +233,12 @@ export function AppointmentsView({
         Reason: a.reason ?? "",
       })}
       toolbar={
-        <div className="flex flex-wrap items-center gap-2">
+        <>
           <DateNavigator value={day} onChange={setDay} />
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="h-9 rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="h-9 shrink-0 rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             {STATUS_FILTERS.map((f) => (
               <option key={f.value} value={f.value}>{f.label}</option>
@@ -254,7 +254,7 @@ export function AppointmentsView({
               defaultOpen={autoOpenBook}
             />
           )}
-        </div>
+        </>
       }
     />
     {rescheduling && (

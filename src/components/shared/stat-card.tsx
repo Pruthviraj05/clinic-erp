@@ -9,6 +9,8 @@ export interface StatCardProps {
   /** e.g. +12.5 (percent). Positive renders green, negative red. */
   trend?: number;
   hint?: string;
+  /** Small labelled counts shown under the main value, e.g. New vs Follow-up. */
+  breakdown?: { label: string; value: number }[];
   accent?: "primary" | "success" | "warning" | "info" | "destructive";
 }
 
@@ -26,6 +28,7 @@ export function StatCard({
   icon: Icon,
   trend,
   hint,
+  breakdown,
   accent = "primary",
 }: StatCardProps) {
   const hasTrend = typeof trend === "number";
@@ -56,6 +59,19 @@ export function StatCard({
             </span>
           )}
           {hint ? <span className="text-muted-foreground">{hint}</span> : null}
+        </div>
+      )}
+      {breakdown && breakdown.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3 text-xs">
+          {breakdown.map((b) => (
+            <span
+              key={b.label}
+              className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 font-medium text-muted-foreground"
+            >
+              {b.label}
+              <span className="font-semibold text-foreground">{b.value}</span>
+            </span>
+          ))}
         </div>
       )}
     </Card>

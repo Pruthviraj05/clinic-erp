@@ -98,10 +98,10 @@ export function DataTable<TData, TValue>({
           ) : (
             <div />
           )}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {toolbar}
             {exportName && (
-              <Button variant="outline" size="sm" onClick={handleExport}>
+              <Button variant="outline" size="lg" className="h-9 shrink-0" onClick={handleExport}>
                 <FileSpreadsheet className="size-4" /> Export
               </Button>
             )}

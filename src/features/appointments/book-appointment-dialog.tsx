@@ -74,7 +74,7 @@ export function BookAppointmentDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className={buttonVariants()}>
+      <DialogTrigger className={buttonVariants({ size: "lg", className: "h-9 shrink-0" })}>
         <CalendarPlus className="size-4" /> {triggerLabel}
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">

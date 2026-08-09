@@ -27,6 +27,8 @@ export function DoctorsView({
   doctors,
   branchNames,
   branchOptions,
+  specializationOptions,
+  departmentOptions,
   canCreate,
   canEdit,
   canDelete,
@@ -34,6 +36,8 @@ export function DoctorsView({
   doctors: Doctor[];
   branchNames: Record<string, string>;
   branchOptions: BranchOption[];
+  specializationOptions: string[];
+  departmentOptions: string[];
   canCreate: boolean;
   canEdit: boolean;
   canDelete: boolean;
@@ -136,6 +140,8 @@ export function DoctorsView({
         <DoctorDialog
           doctor={editing}
           branchOptions={branchOptions}
+          specializationOptions={specializationOptions}
+          departmentOptions={departmentOptions}
           open
           onOpenChange={(o) => {
             if (!o) setEditing(null);
@@ -147,7 +153,15 @@ export function DoctorsView({
         data={doctors}
         searchPlaceholder="Search doctor, specialization…"
         emptyMessage="No doctors found"
-        toolbar={canCreate ? <DoctorDialog branchOptions={branchOptions} /> : undefined}
+        toolbar={
+          canCreate ? (
+            <DoctorDialog
+              branchOptions={branchOptions}
+              specializationOptions={specializationOptions}
+              departmentOptions={departmentOptions}
+            />
+          ) : undefined
+        }
       />
     </>
   );
