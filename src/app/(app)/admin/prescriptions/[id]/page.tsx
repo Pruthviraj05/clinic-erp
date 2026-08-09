@@ -15,7 +15,7 @@ export default async function AdminPrescriptionDetailPage({ params }: { params: 
   const { id } = await params;
   const rx = await getPrescription(id);
   if (!rx) notFound();
-  const { clinic, doctorMeta, patient, design } = clinicInfoFor(rx);
+  const { clinic, doctorMeta, patient, design } = await clinicInfoFor(rx);
   const qrDataUrl = await generateQrDataUrl(`https://clinicore.app/verify/rx/${rx.id}`);
   return (
     <div className="space-y-4">

@@ -3,14 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { authorize } from "@/lib/guard";
-import { addUser, findUserByEmail, hashPassword, users } from "@/server/demo/users-store";
+import { hashPassword } from "@/server/demo/users-store";
+import { db } from "@/server/repositories";
 import { logAudit } from "@/server/demo/extra";
+import type { UserAccount } from "@/server/demo/users-store";
 import type { ActionResult } from "./appointment.actions";
 
 /**
  * Administrator account management (admin-only, via the roles module).
- * Accounts become sign-in-able the moment credentials auth is switched on
- * (`NEXT_PUBLIC_AUTH_MODE=credentials`) — until then they are inert records.
+ * Real accounts — sign-in-able whenever `NEXT_PUBLIC_AUTH_MODE=credentials`.
  */
 
 const adminSchema = z.object({
@@ -37,19 +38,24 @@ export async function createAdminAction(
   }
   const input = parsed.data;
 
-  if (findUserByEmail(input.email)) {
+  const accounts = await db.users.list();
+  const normalized = input.email.trim().toLowerCase();
+  if (accounts.some((u) => u.email.toLowerCase() === normalized)) {
     return { ok: false, message: "An account with that email already exists.", fieldErrors: { email: ["Already in use"] } };
   }
 
-  const created = addUser({
+  const created: UserAccount = {
+    id: `usr_${Date.now().toString(36)}`,
     fullName: input.fullName,
     email: input.email,
     role: "ADMIN",
     passwordHash: hashPassword(input.password),
     isActive: true,
-  });
+    createdAt: new Date().toISOString(),
+  };
+  await db.users.insert(created);
 
-  logAudit({
+  await logAudit({
     actor: user.fullName,
     role: user.role,
     action: "CREATE",
@@ -65,14 +71,17 @@ export async function setUserActiveAction(id: string, active: boolean): Promise<
   if (!authz.ok) return authz;
   const { user } = authz.session;
 
-  const account = users.find((u) => u.id === id);
+  const account = await db.users.get(id);
   if (!account) return { ok: false, message: "Account not found." };
-  if (!active && account.role === "ADMIN" && users.filter((u) => u.role === "ADMIN" && u.isActive).length <= 1) {
-    return { ok: false, message: "At least one active administrator is required." };
+  if (!active && account.role === "ADMIN") {
+    const accounts = await db.users.list();
+    if (accounts.filter((u) => u.role === "ADMIN" && u.isActive).length <= 1) {
+      return { ok: false, message: "At least one active administrator is required." };
+    }
   }
 
-  account.isActive = active;
-  logAudit({
+  await db.users.update(id, { isActive: active });
+  await logAudit({
     actor: user.fullName,
     role: user.role,
     action: "STATUS_CHANGE",

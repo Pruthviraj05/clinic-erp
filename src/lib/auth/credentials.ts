@@ -1,22 +1,23 @@
 import "server-only";
-import { findUserByEmail, verifyPassword, type UserAccount } from "@/server/demo/users-store";
+import { verifyPassword } from "@/server/demo/users-store";
+import { db } from "@/server/repositories";
+import type { UserAccount } from "@/server/demo/users-store";
 
 /**
- * Credentials authentication — READY BUT NOT ACTIVE.
+ * Credentials authentication — the real login. `/login` renders the
+ * email/password form (see `appConfig.authMode`), which calls
+ * `signInWithPassword` → `authenticate()` here, verifying against `db.users`.
  *
- * `appConfig.authMode` is "demo" (role-switch login). Set
- * `NEXT_PUBLIC_AUTH_MODE=credentials` to render the email/password form on
- * /login, which calls `signInWithPassword` → `authenticate()` here. The
- * session cookie contract is unchanged, so nothing else moves.
- *
- * Production hardening on activation: signed session tokens (JWT/iron-session)
- * instead of the role cookie, rate limiting, lockout after N failures, OTP.
+ * Production hardening still to add: rate limiting, lockout after N failed
+ * attempts, OTP/2FA — tracked in docs/05-roadmap.md.
  */
 export async function authenticate(
   email: string,
   password: string,
 ): Promise<{ ok: true; user: UserAccount } | { ok: false; message: string }> {
-  const user = findUserByEmail(email);
+  const normalized = email.trim().toLowerCase();
+  const accounts = await db.users.list();
+  const user = accounts.find((u) => u.email.toLowerCase() === normalized);
   if (!user || !user.isActive) {
     return { ok: false, message: "No active account found for that email." };
   }

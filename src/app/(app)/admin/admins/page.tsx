@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requireRole } from "@/lib/guard";
-import { users } from "@/server/demo/users-store";
+import { db } from "@/server/repositories";
 import { appConfig } from "@/config/app.config";
 import { can } from "@/lib/rbac";
 import { PageHeader } from "@/components/shared/page-header";
@@ -10,6 +10,7 @@ export const metadata: Metadata = { title: "Administrators" };
 
 export default async function AdminAccountsPage() {
   const { user } = await requireRole("ADMIN");
+  const users = await db.users.list();
 
   return (
     <div>

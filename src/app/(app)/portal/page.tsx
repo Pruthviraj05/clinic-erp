@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CalendarDays, FileText, Receipt, CalendarPlus, HeartPulse } from "lucide-react";
 import { requireRole } from "@/lib/guard";
-import { appointments, prescriptions, invoices, patients, PORTAL_PATIENT_ID } from "@/server/demo/data";
+import { db } from "@/server/repositories";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
 import { SectionCard } from "@/components/shared/section-card";
@@ -13,14 +13,20 @@ import { AppointmentsPanel } from "@/features/dashboard/widgets";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 export default async function PortalDashboardPage() {
-  await requireRole("PATIENT");
+  const { user } = await requireRole("PATIENT");
 
-  const patient = patients.find((p) => p.id === PORTAL_PATIENT_ID)!;
-  const myAppts = appointments
-    .filter((a) => a.patientId === PORTAL_PATIENT_ID && new Date(a.scheduledStart) > new Date())
+  const [allPatients, allAppointments, allPrescriptions, allInvoices] = await Promise.all([
+    db.patients.list(),
+    db.appointments.list(),
+    db.prescriptions.list(),
+    db.invoices.list(),
+  ]);
+  const patient = allPatients.find((p) => p.id === user.linkId)!;
+  const myAppts = allAppointments
+    .filter((a) => a.patientId === user.linkId && new Date(a.scheduledStart) > new Date())
     .sort((a, b) => a.scheduledStart.localeCompare(b.scheduledStart));
-  const myRx = prescriptions.filter((p) => p.patientId === PORTAL_PATIENT_ID);
-  const myBills = invoices.filter((i) => i.patientId === PORTAL_PATIENT_ID);
+  const myRx = allPrescriptions.filter((p) => p.patientId === user.linkId);
+  const myBills = allInvoices.filter((i) => i.patientId === user.linkId);
   const outstanding = myBills.reduce((s, i) => s + i.balanceAmount, 0);
 
   return (

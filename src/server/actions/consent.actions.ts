@@ -3,11 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { authorize } from "@/lib/guard";
-import { consentForms, logAudit } from "@/server/demo/extra";
-import { doctors, patients, PORTAL_PATIENT_ID } from "@/server/demo/data";
+import { db } from "@/server/repositories";
+import { logAudit } from "@/server/demo/extra";
 import type { ActionResult } from "./appointment.actions";
-
-let consentSeq = 100;
+import type { ConsentFormItem } from "@/server/demo/extra";
 
 function revalidateConsent() {
   revalidatePath("/portal/consent");
@@ -43,12 +42,11 @@ export async function createConsentAction(
   }
   const input = parsed.data;
 
-  const patient = patients.find((p) => p.id === input.patientId);
-  const doctor = doctors.find((d) => d.id === input.doctorId);
+  const [patient, doctor] = await Promise.all([db.patients.get(input.patientId), db.doctors.get(input.doctorId)]);
   if (!patient || !doctor) return { ok: false, message: "Invalid patient or doctor." };
 
-  const id = `cf_${consentSeq++}`;
-  consentForms.unshift({
+  const id = `cf_${Date.now().toString(36)}`;
+  const form: ConsentFormItem = {
     id,
     patientId: patient.id,
     patientName: patient.fullName,
@@ -60,9 +58,10 @@ export async function createConsentAction(
     status: "PENDING",
     createdBy: user.fullName,
     updatedAt: new Date().toISOString(),
-  });
+  };
+  await db.consentForms.insert(form);
 
-  logAudit({
+  await logAudit({
     actor: user.fullName,
     role: user.role,
     action: "CREATE",
@@ -92,31 +91,34 @@ export async function updateConsentAction(
   }
   const input = parsed.data;
 
-  const form = consentForms.find((c) => c.id === input.id);
+  const form = await db.consentForms.get(input.id);
   if (!form) return { ok: false, message: "Consent form not found." };
   if (form.status === "SIGNED") {
     return { ok: false, message: "A signed consent form can no longer be edited." };
   }
-  // Doctors edit only forms assigned to them (demo doctor mapping).
-  if (user.role === "DOCTOR" && form.doctorId !== "doc_mehta") {
+  // Doctors edit only forms assigned to them.
+  if (user.role === "DOCTOR" && form.doctorId !== user.linkId) {
     return { ok: false, message: "You can only edit consent forms assigned to you." };
   }
-  const doctor = doctors.find((d) => d.id === input.doctorId);
+  const doctor = await db.doctors.get(input.doctorId);
   if (!doctor) return { ok: false, message: "Invalid doctor." };
 
-  form.title = input.title;
-  form.body = input.body;
-  form.details = input.details || undefined;
-  form.doctorId = doctor.id;
-  form.doctorName = doctor.fullName;
-  form.updatedAt = new Date().toISOString();
+  const updated = await db.consentForms.update(input.id, {
+    title: input.title,
+    body: input.body,
+    details: input.details || undefined,
+    doctorId: doctor.id,
+    doctorName: doctor.fullName,
+    updatedAt: new Date().toISOString(),
+  });
+  if (!updated) return { ok: false, message: "Consent form not found." };
 
-  logAudit({
+  await logAudit({
     actor: user.fullName,
     role: user.role,
     action: "UPDATE",
     entity: "ConsentForm",
-    summary: `Edited consent “${form.title}” for ${form.patientName}`,
+    summary: `Edited consent “${updated.title}” for ${updated.patientName}`,
   });
   revalidateConsent();
   return { ok: true, message: "Consent form updated." };
@@ -124,8 +126,6 @@ export async function updateConsentAction(
 
 /**
  * Record a signed consent form with the captured e-signature.
- * DEMO MODE: mutates the in-memory list. PRISMA MODE: updates ConsentForm with
- * status SIGNED, the signature asset URL and a signedAt timestamp.
  */
 export async function signConsentAction(
   id: string,
@@ -136,28 +136,30 @@ export async function signConsentAction(
   if (!signatureDataUrl || !signatureDataUrl.startsWith("data:image")) {
     return { ok: false, message: "Please provide a signature before submitting." };
   }
-  const form = consentForms.find((c) => c.id === id);
+  const form = await db.consentForms.get(id);
   if (!form) return { ok: false, message: "Consent form not found." };
   if (form.status === "SIGNED") {
     return { ok: false, message: "This consent form is already signed." };
   }
-  // Ownership: a patient may only sign their OWN forms. (Demo portal maps to
-  // one patient; with real auth this becomes the session user's patientId.)
+  // Ownership: a patient may only sign their own forms.
   const { user } = authz.session;
-  if (user.role === "PATIENT" && form.patientId !== PORTAL_PATIENT_ID) {
+  if (user.role === "PATIENT" && form.patientId !== user.linkId) {
     return { ok: false, message: "You can only sign your own consent forms." };
   }
 
-  form.status = "SIGNED";
-  form.signatureDataUrl = signatureDataUrl;
-  form.signedAt = new Date().toISOString();
+  const updated = await db.consentForms.update(id, {
+    status: "SIGNED",
+    signatureDataUrl,
+    signedAt: new Date().toISOString(),
+  });
+  if (!updated) return { ok: false, message: "Consent form not found." };
 
-  logAudit({
+  await logAudit({
     actor: user.fullName,
     role: user.role,
     action: "SIGN",
     entity: "ConsentForm",
-    summary: `Signed consent “${form.title}” (${form.patientName})`,
+    summary: `Signed consent “${updated.title}” (${updated.patientName})`,
   });
   revalidateConsent();
   return { ok: true, message: "Consent signed successfully." };

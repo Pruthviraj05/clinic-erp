@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { authorize } from "@/lib/guard";
 import { addMedicine, applyStockChange, lowStockItems, updateMedicine } from "@/server/demo/inventory-store";
-import { notifications } from "@/server/demo/data";
+import { db } from "@/server/repositories";
 import { logAudit } from "@/server/demo/extra";
 import { addMedicineSchema, adjustStockSchema, editMedicineSchema } from "@/features/inventory/schema";
 import type { ActionResult } from "./appointment.actions";
@@ -20,7 +20,14 @@ export async function addMedicineAction(
   if (!parsed.success) {
     return { ok: false, message: "Please fix the highlighted fields.", fieldErrors: parsed.error.flatten().fieldErrors };
   }
-  const med = addMedicine({ ...parsed.data, by: session.user.fullName });
+  const med = await addMedicine({ ...parsed.data, by: session.user.fullName });
+  await logAudit({
+    actor: session.user.fullName,
+    role: session.user.role,
+    action: "CREATE",
+    entity: "Medicine",
+    summary: `Added medicine ${med.name}`,
+  });
   revalidatePath("/admin/inventory");
   return { ok: true, message: `Added ${med.name}.`, data: med };
 }
@@ -38,8 +45,15 @@ export async function adjustStockAction(
   }
   const { medicineId, direction, quantity, reason } = parsed.data;
   const delta = direction === "IN" ? quantity : -quantity;
-  const res = applyStockChange(medicineId, delta, direction === "IN" ? "IN" : "OUT", reason, session.user.fullName);
+  const res = await applyStockChange(medicineId, delta, direction === "IN" ? "IN" : "OUT", reason, session.user.fullName);
   if (!res.ok) return { ok: false, message: res.message };
+  await logAudit({
+    actor: session.user.fullName,
+    role: session.user.role,
+    action: "UPDATE",
+    entity: "Medicine",
+    summary: `Stock ${direction === "IN" ? "added" : "removed"} — new balance ${res.balanceAfter}`,
+  });
   revalidatePath("/admin/inventory");
   return { ok: true, message: `Stock ${direction === "IN" ? "added" : "removed"}. New balance: ${res.balanceAfter}.` };
 }
@@ -56,7 +70,7 @@ export async function updateMedicineAction(
     return { ok: false, message: "Please fix the highlighted fields.", fieldErrors: parsed.error.flatten().fieldErrors };
   }
   const { id, name, genericName, category, brand, unit, reorderLevel, sellPrice } = parsed.data;
-  const med = updateMedicine(
+  const med = await updateMedicine(
     id,
     {
       name,
@@ -70,7 +84,7 @@ export async function updateMedicineAction(
     session.user.fullName,
   );
   if (!med) return { ok: false, message: "Medicine not found." };
-  logAudit({
+  await logAudit({
     actor: session.user.fullName,
     role: session.user.role,
     action: "UPDATE",
@@ -86,9 +100,9 @@ export async function setMedicineActiveAction(id: string, active: boolean): Prom
   const authz = await authorize("inventory", active ? "edit" : "delete");
   if (!authz.ok) return authz;
   const { session } = authz;
-  const med = updateMedicine(id, { isActive: active }, session.user.fullName);
+  const med = await updateMedicine(id, { isActive: active }, session.user.fullName);
   if (!med) return { ok: false, message: "Medicine not found." };
-  logAudit({
+  await logAudit({
     actor: session.user.fullName,
     role: session.user.role,
     action: "STATUS_CHANGE",
@@ -106,12 +120,12 @@ export async function setMedicineActiveAction(id: string, active: boolean): Prom
 export async function sendLowStockAlertAction(): Promise<ActionResult<{ count: number }>> {
   const authz = await authorize("inventory", "edit");
   if (!authz.ok) return authz;
-  const low = lowStockItems();
+  const low = await lowStockItems();
   if (low.length === 0) return { ok: true, message: "No low-stock items to alert.", data: { count: 0 } };
 
   const now = new Date().toISOString();
   for (const m of low) {
-    notifications.unshift({
+    await db.notifications.insert({
       id: `ntf_low_${m.id}_${Date.now()}`,
       type: "INVENTORY_LOW_STOCK",
       channel: "WHATSAPP",

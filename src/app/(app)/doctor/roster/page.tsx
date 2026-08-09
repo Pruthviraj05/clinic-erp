@@ -8,7 +8,6 @@ export const metadata: Metadata = { title: "Roster & Leave" };
 
 export default async function DoctorRosterPage() {
   const { user } = await requireRole("DOCTOR");
-  // The demo doctor is Dr. Ananya Mehta.
   const myLeaves = doctorLeaves.filter((l) => l.doctorName === user.fullName);
   return (
     <div>

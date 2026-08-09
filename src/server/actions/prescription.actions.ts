@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { authorize } from "@/lib/guard";
-import { appointments, patients, prescriptions } from "@/server/demo/data";
+import { db } from "@/server/repositories";
 import { addRxTemplate } from "@/server/demo/template-store";
-import { saveRxDesign, RX_ACCENTS, type RxDesign } from "@/server/demo/rx-design-store";
+import { RX_ACCENTS, type RxDesign } from "@/server/demo/rx-design-store";
 import { logAudit } from "@/server/demo/extra";
 import type { Prescription } from "@/types/domain";
 import type { ActionResult } from "./appointment.actions";
@@ -61,7 +61,7 @@ export async function createPrescriptionAction(
   }
   const input = parsed.data;
 
-  const appt = appointments.find((a) => a.id === input.appointmentId);
+  const appt = await db.appointments.get(input.appointmentId);
   if (!appt) return { ok: false, message: "Appointment not found." };
   if (input.diagnoses.length === 0 && input.medicines.length === 0) {
     return { ok: false, message: "Add at least a diagnosis or a medicine before saving." };
@@ -89,14 +89,13 @@ export async function createPrescriptionAction(
     createdAt: now,
     vitals: input.vitals && Object.keys(input.vitals).length ? input.vitals : undefined,
   };
-  prescriptions.unshift(rx);
+  await db.prescriptions.insert(rx);
 
   // Consultation done → complete the appointment + stamp the patient.
-  appt.status = "COMPLETED";
-  const patient = patients.find((p) => p.id === appt.patientId);
-  if (patient) patient.lastVisitAt = now;
+  await db.appointments.update(appt.id, { status: "COMPLETED" });
+  await db.patients.update(appt.patientId, { lastVisitAt: now });
 
-  logAudit({
+  await logAudit({
     actor: user.fullName,
     role: user.role,
     action: "CREATE",
@@ -136,10 +135,10 @@ export async function updatePrescriptionAction(
   }
   const input = parsed.data;
 
-  const rx = prescriptions.find((p) => p.id === input.prescriptionId);
+  const rx = await db.prescriptions.get(input.prescriptionId);
   if (!rx) return { ok: false, message: "Prescription not found." };
-  // Demo doctor scope: a doctor edits only their own prescriptions.
-  if (user.role === "DOCTOR" && rx.doctorId !== "doc_mehta") {
+  // A doctor edits only their own prescriptions.
+  if (user.role === "DOCTOR" && rx.doctorId !== user.linkId) {
     return { ok: false, message: "You can only edit your own prescriptions." };
   }
   if (input.diagnoses.length === 0 && input.medicines.length === 0) {
@@ -149,15 +148,18 @@ export async function updatePrescriptionAction(
     return { ok: false, message: "Invalid follow-up date." };
   }
 
-  rx.diagnoses = input.diagnoses;
-  rx.symptoms = [input.complaints.join(", "), input.notes?.trim()].filter(Boolean).join(". ") || null;
-  rx.medicines = input.medicines;
-  rx.investigations = input.investigations;
-  rx.advice = input.advice.join(" ") || null;
-  rx.followUpDate = input.followUpDate ? new Date(`${input.followUpDate}T09:00`).toISOString() : null;
-  if (input.vitals && Object.keys(input.vitals).length) rx.vitals = input.vitals;
+  const updated = await db.prescriptions.update(rx.id, {
+    diagnoses: input.diagnoses,
+    symptoms: [input.complaints.join(", "), input.notes?.trim()].filter(Boolean).join(". ") || null,
+    medicines: input.medicines,
+    investigations: input.investigations,
+    advice: input.advice.join(" ") || null,
+    followUpDate: input.followUpDate ? new Date(`${input.followUpDate}T09:00`).toISOString() : null,
+    ...(input.vitals && Object.keys(input.vitals).length ? { vitals: input.vitals } : {}),
+  });
+  if (!updated) return { ok: false, message: "Prescription not found." };
 
-  logAudit({
+  await logAudit({
     actor: user.fullName,
     role: user.role,
     action: "UPDATE",
@@ -169,7 +171,7 @@ export async function updatePrescriptionAction(
   revalidatePath(`/doctor/prescriptions/${rx.id}`);
   revalidatePath("/admin/prescriptions");
   revalidatePath("/portal/prescriptions");
-  return { ok: true, message: `Prescription updated for ${rx.patientName}.`, data: rx };
+  return { ok: true, message: `Prescription updated for ${updated.patientName}.`, data: updated };
 }
 
 const rxDesignSchema = z.object({
@@ -195,11 +197,13 @@ export async function saveRxDesignAction(
   const parsed = rxDesignSchema.safeParse(payload);
   if (!parsed.success) return { ok: false, message: "Design could not be validated." };
 
-  // Demo doctor mapping (real auth links user → doctor record).
-  const doctorId = user.role === "DOCTOR" ? "doc_mehta" : user.id;
-  const design = saveRxDesign({ doctorId, ...parsed.data });
+  const doctorId = user.role === "DOCTOR" ? user.linkId! : user.id;
+  const existing = await db.rxDesigns.get(doctorId);
+  const design = { id: doctorId, doctorId, ...parsed.data };
+  if (existing) await db.rxDesigns.update(doctorId, design);
+  else await db.rxDesigns.insert(design);
 
-  logAudit({
+  await logAudit({
     actor: user.fullName,
     role: user.role,
     action: "UPDATE",
@@ -234,8 +238,8 @@ export async function saveRxTemplateAction(
     return { ok: false, message: "Add a diagnosis or medicines before saving a template." };
   }
 
-  const tpl = addRxTemplate({ ...parsed.data, doctorId: user.id });
-  logAudit({
+  const tpl = await addRxTemplate({ ...parsed.data, doctorId: user.linkId ?? user.id });
+  await logAudit({
     actor: user.fullName,
     role: user.role,
     action: "CREATE",

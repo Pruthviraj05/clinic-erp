@@ -2,17 +2,17 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE } from "@/lib/session";
+import { SESSION_COOKIE, DEMO_ROLE_COOKIE, signSessionToken } from "@/lib/session";
 import { ROLE_HOME, type Role } from "@/lib/rbac";
 
 /**
- * TEMPORARY auth: selecting a role sets a cookie and opens that role's home.
- * When real authentication is added, replace the cookie write with a verified
- * sign-in — every other consumer reads through `getSession()` and is unaffected.
+ * Hidden dev fallback (see /dev-login, unlinked from the real login page):
+ * selecting a role sets the demo cookie and opens that role's home. Does not
+ * touch the real `users` collection — for quickly checking any screen.
  */
 export async function signInAs(role: Role) {
   const store = await cookies();
-  store.set(SESSION_COOKIE, role, {
+  store.set(DEMO_ROLE_COOKIE, role, {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
@@ -24,6 +24,7 @@ export async function signInAs(role: Role) {
 export async function signOut() {
   const store = await cookies();
   store.delete(SESSION_COOKIE);
+  store.delete(DEMO_ROLE_COOKIE);
   redirect("/login");
 }
 
@@ -33,10 +34,10 @@ export interface SignInResult {
 }
 
 /**
- * Email/password sign-in — READY BUT NOT ACTIVE (`appConfig.authMode` is
- * "demo"). The /login page renders the password form only in credentials
- * mode. Verifies against the users store (scrypt hashes) and then issues the
- * same session cookie the rest of the app already consumes.
+ * Real email/password sign-in. Verifies against the users store (scrypt
+ * hashes), then issues an HMAC-signed session cookie identifying that real
+ * account — every subsequent request resolves the actual user (and their
+ * linked doctor/receptionist/patient record) via `getSession()`.
  */
 export async function signInWithPassword(
   _prev: SignInResult | null,
@@ -51,7 +52,7 @@ export async function signInWithPassword(
   if (!result.ok) return { ok: false, message: result.message };
 
   const store = await cookies();
-  store.set(SESSION_COOKIE, result.user.role, {
+  store.set(SESSION_COOKIE, signSessionToken(result.user.id), {
     httpOnly: true,
     sameSite: "lax",
     path: "/",

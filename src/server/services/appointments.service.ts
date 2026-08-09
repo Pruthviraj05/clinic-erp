@@ -1,14 +1,13 @@
 import "server-only";
-import { appointments as demoAppointments } from "@/server/demo/data";
+import { db } from "@/server/repositories";
 import type { Appointment } from "@/types/domain";
 import type { SessionUser } from "@/lib/session";
 
 /**
- * Appointment read model + filtering.
- *
- * Currently reads the demo dataset; the same signatures back onto the Prisma
- * repository once DATABASE_URL is live. All queries are scoped to what the
- * caller may see (a doctor sees only their own; a receptionist their branch).
+ * Appointment read model + filtering, backed by MongoDB (or the demo store
+ * in demo mode) via the storage port. All queries are scoped to what the
+ * caller may see (a doctor sees only their own linked record; a receptionist
+ * their branch).
  */
 
 export interface AppointmentFilters {
@@ -20,7 +19,7 @@ export interface AppointmentFilters {
 }
 
 function scopeFor(user: SessionUser): AppointmentFilters {
-  if (user.role === "DOCTOR") return { doctorId: "doc_mehta", branchId: undefined };
+  if (user.role === "DOCTOR") return { doctorId: user.linkId, branchId: undefined };
   if (user.role === "RECEPTIONIST") return { branchId: user.branchId };
   return {};
 }
@@ -39,7 +38,7 @@ export async function listAppointments(
   const doctorId = scope.doctorId ?? filters.doctorId;
   const branchId = scope.branchId ?? filters.branchId;
 
-  let rows = demoAppointments.slice();
+  let rows = await db.appointments.list();
   if (doctorId) rows = rows.filter((a) => a.doctorId === doctorId);
   if (branchId) rows = rows.filter((a) => a.branchId === branchId);
   if (filters.status) rows = rows.filter((a) => a.status === filters.status);
@@ -54,7 +53,7 @@ export async function getAppointment(
   user: SessionUser,
   id: string,
 ): Promise<Appointment | null> {
-  const appt = demoAppointments.find((a) => a.id === id);
+  const appt = await db.appointments.get(id);
   if (!appt) return null;
   // Apply the caller's scope to the single row (no full-list filter+sort).
   const scope = scopeFor(user);

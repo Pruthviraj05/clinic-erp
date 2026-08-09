@@ -3,8 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { authorize } from "@/lib/guard";
-import { branches, doctors, invoices, patients } from "@/server/demo/data";
-import { applyStockChange, findMedicine } from "@/server/demo/inventory-store";
+import { db } from "@/server/repositories";
 import { logAudit } from "@/server/demo/extra";
 import type { Invoice, InvoiceItem } from "@/types/domain";
 import type { ActionResult } from "./appointment.actions";
@@ -15,6 +14,23 @@ const PHARMACY_GST_RATE = 0.12;
 /** Round to 2 decimals — money never leaves an action unrounded. */
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+async function nextInvoiceNumber(): Promise<string> {
+  const count = (await db.invoices.list()).length;
+  return `INV-2026-${String(230 + count + 1).padStart(6, "0")}`;
+}
+
+function revalidateBilling(id?: string) {
+  revalidatePath("/admin/billing");
+  revalidatePath("/reception/billing");
+  revalidatePath("/portal/billing");
+  revalidatePath("/admin/inventory");
+  if (id) {
+    revalidatePath(`/admin/billing/${id}`);
+    revalidatePath(`/reception/billing/${id}`);
+    revalidatePath(`/portal/billing/${id}`);
+  }
 }
 
 export interface PharmacyBillItem {
@@ -39,9 +55,9 @@ export async function createPharmacyBillAction(
   if (!authz.ok) return authz;
   const { session } = authz;
 
-  const patient = patients.find((p) => p.id === payload.patientId);
+  const patient = await db.patients.get(payload.patientId);
   if (!patient) return { ok: false, message: "Please select a patient." };
-  const branch = branches.find((b) => b.id === payload.branchId);
+  const branch = await db.branches.get(payload.branchId);
   if (!branch) return { ok: false, message: "Invalid branch." };
 
   const items = (payload.items ?? []).filter((i) => i.medicineId && i.quantity > 0);
@@ -53,17 +69,19 @@ export async function createPharmacyBillAction(
   for (const it of items) {
     needed.set(it.medicineId, (needed.get(it.medicineId) ?? 0) + it.quantity);
   }
+  const medicineCache = new Map<string, Awaited<ReturnType<typeof db.medicines.get>>>();
   for (const [medicineId, totalQty] of needed) {
-    const med = findMedicine(medicineId);
+    const med = await db.medicines.get(medicineId);
+    medicineCache.set(medicineId, med);
     if (!med) return { ok: false, message: "Invalid medicine selected." };
     if (med.stockQty < totalQty) {
       return { ok: false, message: `Insufficient stock for ${med.name} (only ${med.stockQty} ${med.unit}, bill needs ${totalQty}).` };
     }
   }
 
-  const number = `INV-2026-${String(230 + invoices.length + 1).padStart(6, "0")}`;
+  const number = await nextInvoiceNumber();
   const lineItems: InvoiceItem[] = items.map((it) => {
-    const med = findMedicine(it.medicineId)!;
+    const med = medicineCache.get(it.medicineId)!;
     return {
       description: `${med.name} × ${it.quantity} ${med.unit}`,
       quantity: it.quantity,
@@ -80,13 +98,31 @@ export async function createPharmacyBillAction(
   // so the bill is all-or-nothing.
   const deducted: Array<[string, number]> = [];
   for (const [medicineId, totalQty] of needed) {
-    const res = applyStockChange(medicineId, -totalQty, "SALE", `Dispensed — ${number}`, session.user.fullName);
-    if (!res.ok) {
+    const med = medicineCache.get(medicineId)!;
+    const balanceAfter = med.stockQty - totalQty;
+    if (balanceAfter < 0) {
       for (const [id, qty] of deducted) {
-        applyStockChange(id, qty, "ADJUST", `Rollback — ${number} failed`, session.user.fullName);
+        const m = medicineCache.get(id)!;
+        await db.medicines.update(id, { stockQty: m.stockQty });
       }
-      return { ok: false, message: res.message };
+      return { ok: false, message: `Insufficient stock for ${med.name}.` };
     }
+    await db.medicines.update(medicineId, {
+      stockQty: balanceAfter,
+      updatedBy: session.user.fullName,
+      updatedAt: new Date().toISOString(),
+    });
+    await db.stockMovements.insert({
+      id: `mv_${Date.now().toString(36)}_${medicineId}`,
+      medicineId,
+      medicineName: med.name,
+      type: "SALE",
+      quantity: -totalQty,
+      balanceAfter,
+      reason: `Dispensed — ${number}`,
+      by: session.user.fullName,
+      at: new Date().toISOString(),
+    });
     deducted.push([medicineId, totalQty]);
   }
 
@@ -108,29 +144,18 @@ export async function createPharmacyBillAction(
     balanceAmount: 0,
     createdAt: now,
   };
-  invoices.unshift(invoice);
+  await db.invoices.insert(invoice);
 
-  revalidatePath("/admin/billing");
-  revalidatePath("/reception/billing");
-  revalidatePath("/admin/inventory");
+  await logAudit({
+    actor: session.user.fullName,
+    role: session.user.role,
+    action: "CREATE",
+    entity: "Invoice",
+    summary: `Pharmacy bill ${number} for ${patient.fullName} — ₹${totalAmount}`,
+  });
+
+  revalidateBilling(invoice.id);
   return { ok: true, message: `Bill ${number} generated (${lineItems.length} item(s)). Inventory updated.`, data: invoice };
-}
-
-/* ------------------------------------------------------------------------- */
-
-function nextInvoiceNumber(): string {
-  return `INV-2026-${String(230 + invoices.length + 1).padStart(6, "0")}`;
-}
-
-function revalidateBilling(id?: string) {
-  revalidatePath("/admin/billing");
-  revalidatePath("/reception/billing");
-  revalidatePath("/portal/billing");
-  if (id) {
-    revalidatePath(`/admin/billing/${id}`);
-    revalidatePath(`/reception/billing/${id}`);
-    revalidatePath(`/portal/billing/${id}`);
-  }
 }
 
 const consultationInvoiceSchema = z.object({
@@ -159,9 +184,11 @@ export async function createConsultationInvoiceAction(
   }
   const input = parsed.data;
 
-  const patient = patients.find((p) => p.id === input.patientId);
-  const doctor = doctors.find((d) => d.id === input.doctorId);
-  const branch = branches.find((b) => b.id === input.branchId);
+  const [patient, doctor, branch] = await Promise.all([
+    db.patients.get(input.patientId),
+    db.doctors.get(input.doctorId),
+    db.branches.get(input.branchId),
+  ]);
   if (!patient || !doctor || !branch) return { ok: false, message: "Invalid patient, doctor or branch." };
 
   const subtotal = round2(input.amount);
@@ -170,7 +197,7 @@ export async function createConsultationInvoiceAction(
   const totalAmount = round2(subtotal - discountAmount + taxAmount);
   const paid = input.payment === "PAID_FULL";
 
-  const number = nextInvoiceNumber();
+  const number = await nextInvoiceNumber();
   const invoice: Invoice = {
     id: `inv_${Date.now()}`,
     number,
@@ -195,9 +222,9 @@ export async function createConsultationInvoiceAction(
     balanceAmount: paid ? 0 : totalAmount,
     createdAt: new Date().toISOString(),
   };
-  invoices.unshift(invoice);
+  await db.invoices.insert(invoice);
 
-  logAudit({
+  await logAudit({
     actor: user.fullName,
     role: user.role,
     action: "CREATE",
@@ -229,7 +256,7 @@ export async function recordPaymentAction(
   }
   const { invoiceId, amount, mode } = parsed.data;
 
-  const invoice = invoices.find((i) => i.id === invoiceId);
+  const invoice = await db.invoices.get(invoiceId);
   if (!invoice) return { ok: false, message: "Invoice not found." };
   if (invoice.status === "CANCELLED") return { ok: false, message: "Cannot collect on a cancelled invoice." };
   if (invoice.balanceAmount <= 0) return { ok: false, message: "This invoice is already fully paid." };
@@ -241,13 +268,18 @@ export async function recordPaymentAction(
     };
   }
 
-  invoice.paidAmount = round2(invoice.paidAmount + amount);
-  invoice.balanceAmount = round2(invoice.totalAmount - invoice.paidAmount);
-  const settled = invoice.balanceAmount <= 0;
-  invoice.paymentStatus = settled ? "PAID" : "PARTIAL";
-  invoice.status = settled ? "PAID" : "PARTIALLY_PAID";
+  const paidAmount = round2(invoice.paidAmount + amount);
+  const balanceAmount = round2(invoice.totalAmount - paidAmount);
+  const settled = balanceAmount <= 0;
+  const updated = await db.invoices.update(invoiceId, {
+    paidAmount,
+    balanceAmount,
+    paymentStatus: settled ? "PAID" : "PARTIAL",
+    status: settled ? "PAID" : "PARTIALLY_PAID",
+  });
+  if (!updated) return { ok: false, message: "Invoice not found." };
 
-  logAudit({
+  await logAudit({
     actor: user.fullName,
     role: user.role,
     action: "UPDATE",
@@ -259,7 +291,7 @@ export async function recordPaymentAction(
     ok: true,
     message: settled
       ? `${invoice.number} fully settled.`
-      : `₹${amount} recorded — ₹${invoice.balanceAmount} outstanding.`,
-    data: invoice,
+      : `₹${amount} recorded — ₹${updated.balanceAmount} outstanding.`,
+    data: updated,
   };
 }

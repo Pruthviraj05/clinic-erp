@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { requireRole } from "@/lib/guard";
 import { listAppointments } from "@/server/services/appointments.service";
-import { branches, doctors, patients } from "@/server/demo/data";
+import { db } from "@/server/repositories";
 import { PageHeader } from "@/components/shared/page-header";
 import { AppointmentsView } from "@/features/appointments/appointments-view";
 
@@ -9,7 +9,12 @@ export const metadata: Metadata = { title: "Appointments" };
 
 export default async function AdminAppointmentsPage() {
   const { user } = await requireRole("ADMIN");
-  const appointments = await listAppointments(user, { range: "all" });
+  const [appointments, branches, doctors, patients] = await Promise.all([
+    listAppointments(user, { range: "all" }),
+    db.branches.list(),
+    db.doctors.list(),
+    db.patients.list(),
+  ]);
 
   return (
     <div>

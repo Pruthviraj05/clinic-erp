@@ -1,5 +1,5 @@
 import "server-only";
-import { invoices, PORTAL_PATIENT_ID } from "@/server/demo/data";
+import { db } from "@/server/repositories";
 import type { Invoice } from "@/types/domain";
 import type { SessionUser } from "@/lib/session";
 
@@ -9,7 +9,7 @@ function branchScope(user: SessionUser): string | undefined {
 
 export async function listInvoices(user: SessionUser, patientId?: string): Promise<Invoice[]> {
   const branchId = branchScope(user);
-  let rows = invoices.slice();
+  let rows = await db.invoices.list();
   if (branchId) rows = rows.filter((i) => i.branchId === branchId);
   if (patientId) rows = rows.filter((i) => i.patientId === patientId);
   return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -17,10 +17,10 @@ export async function listInvoices(user: SessionUser, patientId?: string): Promi
 
 /** Scoped single-invoice read: receptionists see their branch, patients only their own. */
 export async function getInvoice(user: SessionUser, id: string): Promise<Invoice | null> {
-  const invoice = invoices.find((i) => i.id === id) ?? null;
+  const invoice = await db.invoices.get(id);
   if (!invoice) return null;
   if (user.role === "RECEPTIONIST" && user.branchId && invoice.branchId !== user.branchId) return null;
-  if (user.role === "PATIENT" && invoice.patientId !== PORTAL_PATIENT_ID) return null;
+  if (user.role === "PATIENT" && invoice.patientId !== user.linkId) return null;
   return invoice;
 }
 

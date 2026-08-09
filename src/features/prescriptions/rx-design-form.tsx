@@ -121,8 +121,8 @@ export function RxDesignForm({ design, accents }: { design: RxDesign; accents: s
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Preview</p>
         <div className="rounded-xl border bg-card p-4 text-sm shadow-sm" style={{ borderTop: `4px solid ${accentColor}` }}>
-          <p className="text-base font-bold" style={{ color: accentColor }}>Clinicore Central</p>
-          <p className="text-xs text-muted-foreground">Bengaluru · +91 80 4123 0001</p>
+          <p className="text-base font-bold" style={{ color: accentColor }}>Dr. Bhosikar&apos;s Rheumatology Clinic</p>
+          <p className="text-xs text-muted-foreground">Ravet, Pune</p>
           {headerNote ? (
             <p className="mt-2 rounded-md px-2 py-1 text-center text-xs" style={{ background: `${accentColor}12`, color: accentColor }}>
               {headerNote}

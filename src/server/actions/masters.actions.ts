@@ -52,7 +52,7 @@ export async function saveMasterRowAction(
   if (id) {
     const updated = await store.update(id, { name, meta: meta || undefined });
     if (!updated) return { ok: false, message: "Entry not found." };
-    logAudit({
+    await logAudit({
       actor: session.user.fullName,
       role: session.user.role,
       action: "UPDATE",
@@ -65,7 +65,7 @@ export async function saveMasterRowAction(
 
   const row: MasterRow = { id: nextId(), name, meta: meta || undefined, active: true };
   await store.insert(row);
-  logAudit({
+  await logAudit({
     actor: session.user.fullName,
     role: session.user.role,
     action: "CREATE",
@@ -95,7 +95,7 @@ export async function toggleMasterActiveAction(
   const updated = await store.update(id, { active });
   if (!updated) return { ok: false, message: "Entry not found." };
 
-  logAudit({
+  await logAudit({
     actor: session.user.fullName,
     role: session.user.role,
     action: "STATUS_CHANGE",

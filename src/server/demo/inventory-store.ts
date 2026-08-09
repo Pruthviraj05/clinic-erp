@@ -1,49 +1,38 @@
 /**
- * Mutable inventory store for demo mode: stock movements log + helpers that
- * mutate the medicine list and record who changed what. In Prisma mode these
- * become StockMovement rows + Medicine updates inside a transaction.
+ * Inventory domain logic: stock movement math + helpers that mutate the
+ * medicine list and record who changed what, via `db.medicines` /
+ * `db.stockMovements`.
  */
-import { medicines } from "./data";
-import type { Medicine, StockMovementItem, StockMovementType } from "@/types/domain";
-
-function hoursAgo(h: number): string {
-  return new Date(Date.now() - h * 3_600_000).toISOString();
-}
-
-export const stockMovements: StockMovementItem[] = [
-  { id: "mv_1", medicineId: "med_001", medicineName: "Paracetamol 500mg", type: "IN", quantity: 500, balanceAfter: 640, reason: "Purchase — MediSupply", by: "Neha Sharma", at: hoursAgo(30) },
-  { id: "mv_2", medicineId: "med_004", medicineName: "Adapalene 0.1% Gel", type: "SALE", quantity: -3, balanceAfter: 12, reason: "Dispensed — INV-2026-000231", by: "Sana Kapoor", at: hoursAgo(6) },
-  { id: "mv_3", medicineId: "med_002", medicineName: "Amoxicillin 500mg", type: "ADJUST", quantity: -5, balanceAfter: 45, reason: "Damaged stock write-off", by: "Neha Sharma", at: hoursAgo(20) },
-];
+import { db } from "@/server/repositories";
+import type { Medicine, StockMovementType } from "@/types/domain";
 
 let seq = 100;
 function nextId(prefix: string) {
   seq += 1;
-  return `${prefix}_${seq}`;
+  return `${prefix}_${seq}_${Date.now().toString(36)}`;
 }
 
-export function findMedicine(id: string): Medicine | undefined {
-  return medicines.find((m) => m.id === id);
+export async function findMedicine(id: string): Promise<Medicine | null> {
+  return db.medicines.get(id);
 }
 
 /** Apply a signed stock change, stamp the user, and log a movement. */
-export function applyStockChange(
+export async function applyStockChange(
   medicineId: string,
   delta: number,
   type: StockMovementType,
   reason: string,
   by: string,
-): { ok: boolean; message: string; balanceAfter?: number } {
-  const med = findMedicine(medicineId);
+): Promise<{ ok: boolean; message: string; balanceAfter?: number }> {
+  const med = await findMedicine(medicineId);
   if (!med) return { ok: false, message: "Medicine not found." };
   const balanceAfter = med.stockQty + delta;
   if (balanceAfter < 0) {
     return { ok: false, message: `Insufficient stock. Only ${med.stockQty} ${med.unit} available.` };
   }
-  med.stockQty = balanceAfter;
-  med.updatedBy = by;
-  med.updatedAt = new Date().toISOString();
-  stockMovements.unshift({
+  const now = new Date().toISOString();
+  await db.medicines.update(medicineId, { stockQty: balanceAfter, updatedBy: by, updatedAt: now });
+  await db.stockMovements.insert({
     id: nextId("mv"),
     medicineId,
     medicineName: med.name,
@@ -52,12 +41,12 @@ export function applyStockChange(
     balanceAfter,
     reason,
     by,
-    at: med.updatedAt,
+    at: now,
   });
   return { ok: true, message: "Stock updated.", balanceAfter };
 }
 
-export function addMedicine(input: {
+export async function addMedicine(input: {
   name: string;
   genericName?: string;
   category?: string;
@@ -67,7 +56,7 @@ export function addMedicine(input: {
   sellPrice: number;
   openingStock: number;
   by: string;
-}): Medicine {
+}): Promise<Medicine> {
   const now = new Date().toISOString();
   const med: Medicine = {
     id: nextId("med"),
@@ -84,9 +73,9 @@ export function addMedicine(input: {
     updatedBy: input.by,
     updatedAt: now,
   };
-  medicines.push(med);
+  await db.medicines.insert(med);
   if (input.openingStock > 0) {
-    stockMovements.unshift({
+    await db.stockMovements.insert({
       id: nextId("mv"),
       medicineId: med.id,
       medicineName: med.name,
@@ -105,19 +94,14 @@ export function addMedicine(input: {
  * Update medicine attributes (never stockQty — that goes through
  * applyStockChange so every quantity change leaves a movement trail).
  */
-export function updateMedicine(
+export async function updateMedicine(
   id: string,
   patch: Partial<Pick<Medicine, "name" | "genericName" | "category" | "brand" | "unit" | "reorderLevel" | "sellPrice" | "isActive">>,
   by: string,
-): Medicine | null {
-  const med = findMedicine(id);
-  if (!med) return null;
-  Object.assign(med, patch);
-  med.updatedBy = by;
-  med.updatedAt = new Date().toISOString();
-  return med;
+): Promise<Medicine | null> {
+  return db.medicines.update(id, { ...patch, updatedBy: by, updatedAt: new Date().toISOString() });
 }
 
-export function lowStockItems(): Medicine[] {
-  return medicines.filter((m) => m.stockQty <= m.reorderLevel);
+export async function lowStockItems(): Promise<Medicine[]> {
+  return db.medicines.list((m) => m.isActive && m.stockQty <= m.reorderLevel);
 }

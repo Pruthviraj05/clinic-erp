@@ -3,14 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { authorize } from "@/lib/guard";
-import { createGroup, diseaseGroups } from "@/server/demo/disease-store";
-import { patients } from "@/server/demo/data";
+import { createGroup, groupsForDoctor } from "@/server/demo/disease-store";
+import { db } from "@/server/repositories";
 import { logAudit } from "@/server/demo/extra";
 import type { ActionResult } from "./appointment.actions";
 
-/** Demo doctor mapping — real auth resolves the doctor from the session user. */
-function doctorIdFor(role: string, userId: string): string {
-  return role === "DOCTOR" ? "doc_mehta" : userId;
+/** The doctor record this session may manage groups for. */
+function doctorIdFor(role: string, linkId: string | undefined, userId: string): string {
+  return role === "DOCTOR" && linkId ? linkId : userId;
 }
 
 function revalidateDiseasePages() {
@@ -32,18 +32,17 @@ export async function createDiseaseGroupAction(
   const parsed = nameSchema.safeParse(name);
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid name." };
 
-  const doctorId = doctorIdFor(user.role, user.id);
-  const exists = diseaseGroups.find(
-    (g) => g.doctorId === doctorId && g.name.toLowerCase() === parsed.data.toLowerCase(),
-  );
+  const doctorId = doctorIdFor(user.role, user.linkId, user.id);
+  const existingGroups = await groupsForDoctor(doctorId);
+  const exists = existingGroups.find((g) => g.name.toLowerCase() === parsed.data.toLowerCase());
   if (exists) return { ok: false, message: `You already have a “${exists.name}” list.` };
 
-  const group = createGroup(doctorId, parsed.data);
-  if (firstPatientId && patients.some((p) => p.id === firstPatientId)) {
-    group.patientIds.push(firstPatientId);
+  const group = await createGroup(doctorId, parsed.data);
+  if (firstPatientId && (await db.patients.get(firstPatientId))) {
+    await db.diseaseGroups.update(group.id, { patientIds: [firstPatientId] });
   }
 
-  logAudit({
+  await logAudit({
     actor: user.fullName,
     role: user.role,
     action: "CREATE",
@@ -64,20 +63,21 @@ export async function setPatientInGroupAction(
   if (!authz.ok) return authz;
   const { user } = authz.session;
 
-  const doctorId = doctorIdFor(user.role, user.id);
-  const group = diseaseGroups.find((g) => g.id === groupId);
+  const doctorId = doctorIdFor(user.role, user.linkId, user.id);
+  const group = await db.diseaseGroups.get(groupId);
   if (!group) return { ok: false, message: "Disease list not found." };
   if (group.doctorId !== doctorId && user.role !== "ADMIN") {
     return { ok: false, message: "You can only manage your own disease lists." };
   }
-  const patient = patients.find((p) => p.id === patientId);
+  const patient = await db.patients.get(patientId);
   if (!patient) return { ok: false, message: "Patient not found." };
 
-  const idx = group.patientIds.indexOf(patientId);
-  if (present && idx === -1) group.patientIds.push(patientId);
-  if (!present && idx !== -1) group.patientIds.splice(idx, 1);
+  const nextIds = new Set(group.patientIds);
+  if (present) nextIds.add(patientId);
+  else nextIds.delete(patientId);
+  await db.diseaseGroups.update(groupId, { patientIds: Array.from(nextIds) });
 
-  logAudit({
+  await logAudit({
     actor: user.fullName,
     role: user.role,
     action: "UPDATE",

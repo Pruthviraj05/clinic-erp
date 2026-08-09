@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireRole } from "@/lib/guard";
 import { getPrescription } from "@/server/services/prescriptions.service";
-import { PORTAL_PATIENT_ID } from "@/server/demo/data";
 import { PrescriptionDetail } from "@/features/prescriptions/prescription-detail";
 import { clinicInfoFor } from "@/features/prescriptions/clinic-info";
 import { generateQrDataUrl } from "@/lib/qr";
@@ -12,12 +11,12 @@ import { generateQrDataUrl } from "@/lib/qr";
 export const metadata: Metadata = { title: "Prescription" };
 
 export default async function PortalPrescriptionDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireRole("PATIENT");
+  const { user } = await requireRole("PATIENT");
   const { id } = await params;
   const rx = await getPrescription(id);
   // A patient may only view their own prescriptions.
-  if (!rx || rx.patientId !== PORTAL_PATIENT_ID) notFound();
-  const { clinic, doctorMeta, patient, design } = clinicInfoFor(rx);
+  if (!rx || rx.patientId !== user.linkId) notFound();
+  const { clinic, doctorMeta, patient, design } = await clinicInfoFor(rx);
   const qrDataUrl = await generateQrDataUrl(`https://clinicore.app/verify/rx/${rx.id}`);
   return (
     <div className="space-y-4">

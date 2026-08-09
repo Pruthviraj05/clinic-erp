@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Stethoscope, Users } from "lucide-react";
 import { requireRole } from "@/lib/guard";
 import { groupsForDoctor } from "@/server/demo/disease-store";
-import { patients } from "@/server/demo/data";
+import { db } from "@/server/repositories";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -13,8 +13,11 @@ export const metadata: Metadata = { title: "Disease lists" };
 
 /** Doctor's patients grouped by condition. Lists are built during consults. */
 export default async function DoctorDiseasesPage() {
-  await requireRole("DOCTOR");
-  const groups = groupsForDoctor("doc_mehta");
+  const { user } = await requireRole("DOCTOR");
+  const [groups, patients] = await Promise.all([
+    groupsForDoctor(user.linkId ?? user.id),
+    db.patients.list(),
+  ]);
   const byId = new Map(patients.map((p) => [p.id, p]));
   const totalTagged = new Set(groups.flatMap((g) => g.patientIds)).size;
 

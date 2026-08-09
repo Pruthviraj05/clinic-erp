@@ -1,11 +1,10 @@
 import "server-only";
-import { appointments, invoices, patients, prescriptions } from "@/server/demo/data";
-import { medicalRecords } from "@/server/demo/extra";
+import { db } from "@/server/repositories";
 import type { Appointment, Invoice, Patient, Prescription } from "@/types/domain";
 import type { MedicalRecordItem } from "@/server/demo/extra";
 
 export async function listPatients(search?: string): Promise<Patient[]> {
-  let rows = patients.slice();
+  let rows = await db.patients.list();
   if (search) {
     const q = search.toLowerCase();
     rows = rows.filter(
@@ -19,7 +18,7 @@ export async function listPatients(search?: string): Promise<Patient[]> {
 }
 
 export async function getPatient(id: string): Promise<Patient | null> {
-  return patients.find((p) => p.id === id) ?? null;
+  return db.patients.get(id);
 }
 
 export interface PatientBundle {
@@ -31,21 +30,19 @@ export interface PatientBundle {
 }
 
 export async function getPatientBundle(id: string): Promise<PatientBundle | null> {
-  const patient = patients.find((p) => p.id === id);
+  const patient = await db.patients.get(id);
   if (!patient) return null;
+  const [appointments, prescriptions, invoices, records] = await Promise.all([
+    db.appointments.list((a) => a.patientId === id),
+    db.prescriptions.list((p) => p.patientId === id),
+    db.invoices.list((i) => i.patientId === id),
+    db.medicalRecords.list((r) => r.patientId === id),
+  ]);
   return {
     patient,
-    appointments: appointments
-      .filter((a) => a.patientId === id)
-      .sort((a, b) => b.scheduledStart.localeCompare(a.scheduledStart)),
-    prescriptions: prescriptions
-      .filter((p) => p.patientId === id)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    invoices: invoices
-      .filter((i) => i.patientId === id)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    records: medicalRecords
-      .filter((r) => r.patientId === id)
-      .sort((a, b) => b.recordedAt.localeCompare(a.recordedAt)),
+    appointments: appointments.sort((a, b) => b.scheduledStart.localeCompare(a.scheduledStart)),
+    prescriptions: prescriptions.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    invoices: invoices.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    records: records.sort((a, b) => b.recordedAt.localeCompare(a.recordedAt)),
   };
 }

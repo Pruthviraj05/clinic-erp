@@ -1,10 +1,11 @@
-import { prescriptionTemplate } from "./settings-store";
+import { db } from "@/server/repositories";
+import type { PrescriptionTemplate } from "./settings-store";
 
 /**
- * Per-doctor prescription design (demo store). Each doctor customizes the
- * header tagline, footer note, accent colour and default print language of
- * their prescriptions; unset fields fall back to the clinic-wide template
- * from Settings. MongoDB: `rx_designs` collection keyed by doctorId.
+ * Per-doctor prescription design. Each doctor customizes the header tagline,
+ * footer note, accent colour and default print language of their
+ * prescriptions; unset fields fall back to the clinic-wide template from
+ * Settings. Stored via `db.rxDesigns` (id === doctorId).
  */
 export type RxLanguage = "en" | "mr" | "both";
 
@@ -24,38 +25,27 @@ export interface RxDesign {
 
 export const RX_ACCENTS = ["#0f766e", "#1d4ed8", "#7c3aed", "#be123c", "#b45309", "#166534"];
 
-const designs = new Map<string, RxDesign>([
-  [
-    "doc_mehta",
-    {
-      doctorId: "doc_mehta",
-      headerNote: "Skin & Aesthetics · Mon–Sat 9:00 AM – 8:00 PM",
-      footerNote:
-        "This prescription is valid for 30 days. Apply topical medication as directed. Contact the clinic for any adverse reaction.",
-      accentColor: "#0f766e",
-      language: "en",
-      showQr: true,
-      showVitals: true,
-    },
-  ],
-]);
-
-/** Doctor's design merged over the clinic-wide defaults. */
-export function getRxDesign(doctorId: string): RxDesign {
-  const own = designs.get(doctorId);
-  if (own) return { ...own };
+/** No design saved yet for this doctor — derive one from the clinic template. */
+export function defaultRxDesignFor(
+  doctorId: string,
+  clinicSettings: PrescriptionTemplate,
+): RxDesign & { id: string } {
   return {
+    id: doctorId,
     doctorId,
-    headerNote: prescriptionTemplate.headerNote,
-    footerNote: prescriptionTemplate.footerNote,
+    headerNote: clinicSettings.headerNote,
+    footerNote: clinicSettings.footerNote,
     accentColor: RX_ACCENTS[0],
     language: "en",
-    showQr: prescriptionTemplate.showQr,
-    showVitals: prescriptionTemplate.showVitals,
+    showQr: clinicSettings.showQr,
+    showVitals: clinicSettings.showVitals,
   };
 }
 
-export function saveRxDesign(design: RxDesign): RxDesign {
-  designs.set(design.doctorId, { ...design });
-  return design;
+/** Doctor's saved design merged over the clinic-wide defaults. */
+export async function getRxDesignFor(doctorId: string): Promise<RxDesign> {
+  const own = await db.rxDesigns.get(doctorId);
+  if (own) return own;
+  const settings = await db.settings.get();
+  return defaultRxDesignFor(doctorId, settings);
 }

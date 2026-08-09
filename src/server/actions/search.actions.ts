@@ -2,8 +2,7 @@
 
 import { getSession } from "@/lib/session";
 import { can } from "@/lib/rbac";
-import { doctors, medicines, PORTAL_PATIENT_ID } from "@/server/demo/data";
-import { consentForms } from "@/server/demo/extra";
+import { db } from "@/server/repositories";
 import { listPatients } from "@/server/services/patients.service";
 import { listAppointments } from "@/server/services/appointments.service";
 import { listPrescriptions } from "@/server/services/prescriptions.service";
@@ -107,7 +106,7 @@ export async function globalSearchAction(rawQuery: string): Promise<SearchResult
   }
 
   if (can(user.role, "billing", "view")) {
-    const rows = await listInvoices(user, user.role === "PATIENT" ? PORTAL_PATIENT_ID : undefined);
+    const rows = await listInvoices(user, user.role === "PATIENT" ? user.linkId : undefined);
     results.invoices = rows
       .filter((i) => matches(query, i.number, i.patientName))
       .slice(0, LIMIT)
@@ -120,6 +119,7 @@ export async function globalSearchAction(rawQuery: string): Promise<SearchResult
   }
 
   if (can(user.role, "doctors", "view")) {
+    const doctors = await db.doctors.list();
     results.doctors = doctors
       .filter((d) => matches(query, d.fullName, d.specialization, d.registrationNo))
       .slice(0, LIMIT)
@@ -132,6 +132,7 @@ export async function globalSearchAction(rawQuery: string): Promise<SearchResult
   }
 
   if (can(user.role, "inventory", "view")) {
+    const medicines = await db.medicines.list();
     results.medicines = medicines
       .filter((m) => matches(query, m.name, m.genericName, m.brand, m.category))
       .slice(0, LIMIT)
@@ -144,8 +145,9 @@ export async function globalSearchAction(rawQuery: string): Promise<SearchResult
   }
 
   if (can(user.role, "consent", "view")) {
+    const consentForms = await db.consentForms.list();
     const scoped =
-      user.role === "PATIENT" ? consentForms.filter((c) => c.patientId === PORTAL_PATIENT_ID) : consentForms;
+      user.role === "PATIENT" ? consentForms.filter((c) => c.patientId === user.linkId) : consentForms;
     results.consent = scoped
       .filter((c) => matches(query, c.title, c.patientName, c.doctorName))
       .slice(0, LIMIT)

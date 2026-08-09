@@ -1,4 +1,4 @@
-import { branches } from "@/server/demo/data";
+import { db } from "@/server/repositories";
 
 export interface ClinicHeader {
   name: string;
@@ -8,10 +8,10 @@ export interface ClinicHeader {
 }
 
 /** Build a printable clinic header from a branch id. */
-export function clinicFromBranch(branchId: string): ClinicHeader {
-  const branch = branches.find((b) => b.id === branchId);
+export async function clinicFromBranch(branchId: string): Promise<ClinicHeader> {
+  const branch = await db.branches.get(branchId);
   return {
-    name: branch?.name ?? "Clinicore",
+    name: branch?.name ?? "Clinic",
     address: [branch?.city, "India"].filter(Boolean).join(", "),
     phone: branch?.phone ?? "",
     gst: branch?.gstNumber ?? undefined,

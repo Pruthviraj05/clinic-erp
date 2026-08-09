@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { requirePermission } from "@/lib/guard";
-import { consentForms } from "@/server/demo/extra";
-import { doctors } from "@/server/demo/data";
+import { db } from "@/server/repositories";
 import { can } from "@/lib/rbac";
 import { PageHeader } from "@/components/shared/page-header";
 import { ConsentView } from "@/features/consent/consent-view";
@@ -11,9 +10,8 @@ export const metadata: Metadata = { title: "Consent Forms" };
 /** Consent forms assigned to this doctor — editable until the patient signs. */
 export default async function DoctorConsentPage() {
   const { user } = await requirePermission("consent", "view");
-  // Demo doctor mapping; real auth resolves the doctor from the session user.
-  const mine = consentForms.filter((c) => c.doctorId === "doc_mehta");
-
+  const [allConsentForms, doctors] = await Promise.all([db.consentForms.list(), db.doctors.list()]);
+  const mine = allConsentForms.filter((c) => c.doctorId === user.linkId);
   const doctorOptions = doctors
     .filter((d) => d.isActive)
     .map((d) => ({ id: d.id, label: d.fullName, sublabel: d.specialization ?? undefined }));

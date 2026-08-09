@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { requirePermission } from "@/lib/guard";
-import { consentForms } from "@/server/demo/extra";
-import { doctors, patients } from "@/server/demo/data";
+import { db } from "@/server/repositories";
 import { can } from "@/lib/rbac";
 import { PageHeader } from "@/components/shared/page-header";
 import { ConsentView } from "@/features/consent/consent-view";
@@ -13,6 +12,11 @@ export const metadata: Metadata = { title: "Consent Forms" };
 export default async function ReceptionConsentPage() {
   const { user } = await requirePermission("consent", "view");
 
+  const [doctors, patients, consentForms] = await Promise.all([
+    db.doctors.list(),
+    db.patients.list(),
+    db.consentForms.list(),
+  ]);
   const doctorOptions = doctors
     .filter((d) => d.isActive)
     .map((d) => ({ id: d.id, label: d.fullName, sublabel: d.specialization ?? undefined }));

@@ -4,9 +4,44 @@ import { revalidatePath } from "next/cache";
 import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
 import { logAudit } from "@/server/demo/extra";
+import { hashPassword } from "@/server/demo/users-store";
 import { branchSchema, doctorSchema, receptionistSchema } from "@/features/staff/schema";
 import type { ActionResult } from "./appointment.actions";
 import type { Branch, Doctor, Receptionist } from "@/types/domain";
+
+function randomTempPassword(): string {
+  const raw = Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 6);
+  return `${raw}9!`;
+}
+
+/**
+ * Auto-create the login account for a newly added staff member, if their
+ * email isn't already in use. Returns the temp password so the caller can
+ * surface it once (the admin hands it to the new doctor/receptionist).
+ */
+async function createStaffAccount(
+  role: "DOCTOR" | "RECEPTIONIST",
+  fullName: string,
+  email: string,
+  linkId: string,
+  branchId?: string,
+): Promise<string | undefined> {
+  const accounts = await db.users.list();
+  if (accounts.some((a) => a.email.toLowerCase() === email.toLowerCase())) return undefined;
+  const password = randomTempPassword();
+  await db.users.insert({
+    id: `usr_${Date.now().toString(36)}`,
+    fullName,
+    email,
+    role,
+    passwordHash: hashPassword(password),
+    linkId,
+    branchId,
+    isActive: true,
+    createdAt: new Date().toISOString(),
+  });
+  return password;
+}
 
 const BRANCH_PATHS = ["/admin/branches", "/admin/doctors", "/admin/receptionists"];
 const DOCTOR_PATHS = ["/admin/doctors", "/admin/branches"];
@@ -43,7 +78,7 @@ export async function createBranchAction(
   };
   await db.branches.insert(branch);
 
-  logAudit({
+  await logAudit({
     actor: authz.session.user.fullName,
     role: authz.session.user.role,
     action: "CREATE",
@@ -78,7 +113,7 @@ export async function updateBranchAction(
   });
   if (!updated) return { ok: false, message: "Branch not found." };
 
-  logAudit({
+  await logAudit({
     actor: authz.session.user.fullName,
     role: authz.session.user.role,
     action: "UPDATE",
@@ -96,7 +131,7 @@ export async function setBranchActiveAction(id: string, active: boolean): Promis
   const updated = await db.branches.update(id, { isActive: active });
   if (!updated) return { ok: false, message: "Branch not found." };
 
-  logAudit({
+  await logAudit({
     actor: authz.session.user.fullName,
     role: authz.session.user.role,
     action: "STATUS_CHANGE",
@@ -140,8 +175,9 @@ export async function createDoctorAction(
     isActive: true,
   };
   await db.doctors.insert(doctor);
+  const tempPassword = await createStaffAccount("DOCTOR", doctor.fullName, doctor.email, doctor.id);
 
-  logAudit({
+  await logAudit({
     actor: authz.session.user.fullName,
     role: authz.session.user.role,
     action: "CREATE",
@@ -149,7 +185,13 @@ export async function createDoctorAction(
     summary: `Added doctor ${doctor.fullName}`,
   });
   revalidate(DOCTOR_PATHS);
-  return { ok: true, message: `Doctor ${doctor.fullName} added.`, data: doctor };
+  return {
+    ok: true,
+    message: tempPassword
+      ? `Doctor ${doctor.fullName} added. Login: ${doctor.email} / ${tempPassword}`
+      : `Doctor ${doctor.fullName} added.`,
+    data: doctor,
+  };
 }
 
 export async function updateDoctorAction(
@@ -181,7 +223,7 @@ export async function updateDoctorAction(
   });
   if (!updated) return { ok: false, message: "Doctor not found." };
 
-  logAudit({
+  await logAudit({
     actor: authz.session.user.fullName,
     role: authz.session.user.role,
     action: "UPDATE",
@@ -200,7 +242,7 @@ export async function setDoctorActiveAction(id: string, active: boolean): Promis
   const updated = await db.doctors.update(id, { isActive: active });
   if (!updated) return { ok: false, message: "Doctor not found." };
 
-  logAudit({
+  await logAudit({
     actor: authz.session.user.fullName,
     role: authz.session.user.role,
     action: "STATUS_CHANGE",
@@ -240,8 +282,15 @@ export async function createReceptionistAction(
     isActive: true,
   };
   await db.receptionists.insert(receptionist);
+  const tempPassword = await createStaffAccount(
+    "RECEPTIONIST",
+    receptionist.fullName,
+    receptionist.email,
+    receptionist.id,
+    receptionist.branchId,
+  );
 
-  logAudit({
+  await logAudit({
     actor: authz.session.user.fullName,
     role: authz.session.user.role,
     action: "CREATE",
@@ -249,7 +298,13 @@ export async function createReceptionistAction(
     summary: `Added receptionist ${receptionist.fullName}`,
   });
   revalidate(RECEPTIONIST_PATHS);
-  return { ok: true, message: `Receptionist ${receptionist.fullName} added.`, data: receptionist };
+  return {
+    ok: true,
+    message: tempPassword
+      ? `Receptionist ${receptionist.fullName} added. Login: ${receptionist.email} / ${tempPassword}`
+      : `Receptionist ${receptionist.fullName} added.`,
+    data: receptionist,
+  };
 }
 
 export async function updateReceptionistAction(
@@ -277,7 +332,7 @@ export async function updateReceptionistAction(
   });
   if (!updated) return { ok: false, message: "Receptionist not found." };
 
-  logAudit({
+  await logAudit({
     actor: authz.session.user.fullName,
     role: authz.session.user.role,
     action: "UPDATE",
@@ -295,7 +350,7 @@ export async function setReceptionistActiveAction(id: string, active: boolean): 
   const updated = await db.receptionists.update(id, { isActive: active });
   if (!updated) return { ok: false, message: "Receptionist not found." };
 
-  logAudit({
+  await logAudit({
     actor: authz.session.user.fullName,
     role: authz.session.user.role,
     action: "STATUS_CHANGE",

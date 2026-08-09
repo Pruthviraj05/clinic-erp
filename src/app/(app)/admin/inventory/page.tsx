@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { Package, AlertTriangle, CalendarClock, IndianRupee } from "lucide-react";
 import { requireRole } from "@/lib/guard";
 import { can } from "@/lib/rbac";
-import { medicines } from "@/server/demo/data";
-import { stockMovements } from "@/server/demo/inventory-store";
+import { db } from "@/server/repositories";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
 import { InventoryView } from "@/features/inventory/inventory-view";
@@ -15,6 +14,8 @@ export default async function AdminInventoryPage() {
   const session = await requireRole("ADMIN");
   const canEdit = can(session.user.role, "inventory", "edit");
   const canDelete = can(session.user.role, "inventory", "delete");
+
+  const [medicines, stockMovements] = await Promise.all([db.medicines.list(), db.stockMovements.list()]);
 
   const lowStock = medicines.filter((m) => m.stockQty <= m.reorderLevel).length;
   const in30 = new Date(Date.now() + 30 * 86_400_000).toISOString();

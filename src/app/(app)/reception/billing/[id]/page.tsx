@@ -14,12 +14,13 @@ export default async function ReceptionInvoiceDetailPage({ params }: { params: P
   const { id } = await params;
   const invoice = await getInvoice(user, id);
   if (!invoice) notFound();
+  const clinic = await clinicFromBranch(invoice.branchId);
   return (
     <div className="space-y-4">
       <Link href="/reception/billing" className="print-hide inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="size-4" /> Back to billing
       </Link>
-      <InvoiceDetail invoice={invoice} clinic={clinicFromBranch(invoice.branchId)} canCollect />
+      <InvoiceDetail invoice={invoice} clinic={clinic} canCollect />
     </div>
   );
 }

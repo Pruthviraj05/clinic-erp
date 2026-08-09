@@ -1,7 +1,7 @@
 import { CalendarDays, IndianRupee, Users, Package, TrendingUp } from "lucide-react";
 import { requireRole } from "@/lib/guard";
 import { getDashboardData } from "@/server/services/dashboard.service";
-import { medicines } from "@/server/demo/data";
+import { db } from "@/server/repositories";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
 import { SectionCard } from "@/components/shared/section-card";
@@ -11,7 +11,7 @@ import { formatCurrency, formatCurrencyCompact } from "@/lib/format";
 
 export default async function AdminDashboardPage() {
   const { user } = await requireRole("ADMIN");
-  const d = await getDashboardData(user);
+  const [d, medicines] = await Promise.all([getDashboardData(user), db.medicines.list()]);
   const lowStock = medicines.filter((m) => m.stockQty <= m.reorderLevel);
 
   return (

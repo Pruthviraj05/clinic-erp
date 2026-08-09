@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { authorize } from "@/lib/guard";
-import { appointments, branches, doctors, patients, PORTAL_PATIENT_ID } from "@/server/demo/data";
 import { db } from "@/server/repositories";
 import { logAudit } from "@/server/demo/extra";
 import { createAppointmentSchema, rescheduleSchema, updateStatusSchema } from "@/features/appointments/schema";
@@ -15,18 +14,14 @@ export interface ActionResult<T = unknown> {
   fieldErrors?: Record<string, string[]>;
 }
 
-/**
- * Create an appointment.
- * DEMO MODE: mutates the in-memory dataset so the new row appears immediately.
- * PRISMA MODE: this becomes a repository.create inside a transaction that also
- * assigns the token number and emits notifications.
- */
+/** Create an appointment: validates patient/doctor/branch, blocks slot clashes, assigns a token. */
 export async function createAppointmentAction(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult<Appointment>> {
   const authz = await authorize("appointments", "create");
   if (!authz.ok) return authz;
+  const { user } = authz.session;
 
   const parsed = createAppointmentSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
@@ -35,13 +30,15 @@ export async function createAppointmentAction(
   const input = parsed.data;
 
   // Patients may only book for themselves, whatever the posted patientId says.
-  if (authz.session.user.role === "PATIENT") {
-    input.patientId = PORTAL_PATIENT_ID;
+  if (user.role === "PATIENT" && user.linkId) {
+    input.patientId = user.linkId;
   }
 
-  const patient = patients.find((p) => p.id === input.patientId);
-  const doctor = doctors.find((d) => d.id === input.doctorId);
-  const branch = branches.find((b) => b.id === input.branchId);
+  const [patient, doctor, branch] = await Promise.all([
+    db.patients.get(input.patientId),
+    db.doctors.get(input.doctorId),
+    db.branches.get(input.branchId),
+  ]);
   if (!patient || !doctor || !branch) {
     return { ok: false, message: "Invalid patient, doctor or branch." };
   }
@@ -55,14 +52,14 @@ export async function createAppointmentAction(
   const end = new Date(start.getTime() + input.durationMinutes * 60_000);
 
   // Prevent an exact duplicate slot for the same doctor.
-  const clash = appointments.find(
+  const clash = await db.appointments.list(
     (a) => a.doctorId === doctor.id && a.scheduledStart === start.toISOString() && a.status !== "CANCELLED",
   );
-  if (clash) {
+  if (clash.length) {
     return { ok: false, message: "That slot is already booked for this doctor." };
   }
 
-  const todayForBranch = appointments.filter(
+  const todayForBranch = await db.appointments.list(
     (a) => a.branchId === branch.id && new Date(a.scheduledStart).toDateString() === start.toDateString(),
   );
 
@@ -83,7 +80,15 @@ export async function createAppointmentAction(
     reason: input.reason ?? null,
     paymentStatus: "UNPAID",
   };
-  appointments.push(appt);
+  await db.appointments.insert(appt);
+
+  await logAudit({
+    actor: user.fullName,
+    role: user.role,
+    action: "CREATE",
+    entity: "Appointment",
+    summary: `Booked ${appt.patientName} with ${appt.doctorName}`,
+  });
 
   revalidatePath("/admin/appointments");
   revalidatePath("/reception/appointments");
@@ -92,19 +97,27 @@ export async function createAppointmentAction(
   return { ok: true, message: "Appointment booked.", data: appt };
 }
 
-/** Advance/adjust an appointment's status, stamping the relevant timestamp. */
+/** Advance/adjust an appointment's status. */
 export async function updateAppointmentStatusAction(
   id: string,
   status: AppointmentStatus,
 ): Promise<ActionResult> {
   const authz = await authorize("appointments", "edit");
   if (!authz.ok) return authz;
+  const { user } = authz.session;
   const parsed = updateStatusSchema.safeParse({ id, status });
   if (!parsed.success) return { ok: false, message: "Invalid status change." };
 
-  const appt = appointments.find((a) => a.id === id);
-  if (!appt) return { ok: false, message: "Appointment not found." };
-  appt.status = status;
+  const updated = await db.appointments.update(id, { status });
+  if (!updated) return { ok: false, message: "Appointment not found." };
+
+  await logAudit({
+    actor: user.fullName,
+    role: user.role,
+    action: "STATUS_CHANGE",
+    entity: "Appointment",
+    summary: `${updated.patientName} marked ${status.toLowerCase().replace("_", " ")}`,
+  });
 
   revalidatePath("/admin/appointments");
   revalidatePath("/reception/appointments");
@@ -133,14 +146,11 @@ export async function rescheduleAppointmentAction(
   if (!appt) return { ok: false, message: "Appointment not found." };
 
   const start = new Date(`${input.date}T${input.time}`);
-  // Regexes pass out-of-range values like 2026-13-45 — reject Invalid Date
-  // before toISOString() can throw.
   if (Number.isNaN(start.getTime())) {
     return { ok: false, message: "Invalid date or time.", fieldErrors: { date: ["Invalid date or time."] } };
   }
   const end = new Date(start.getTime() + input.durationMinutes * 60_000);
 
-  // Prevent an exact duplicate slot for the same doctor (excluding this one).
   const sameDoctor = await db.appointments.list(
     (a) =>
       a.doctorId === appt.doctorId &&
@@ -159,7 +169,7 @@ export async function rescheduleAppointmentAction(
   });
   if (!updated) return { ok: false, message: "Appointment not found." };
 
-  logAudit({
+  await logAudit({
     actor: authz.session.user.fullName,
     role: authz.session.user.role,
     action: "UPDATE",

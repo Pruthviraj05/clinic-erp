@@ -27,17 +27,17 @@ export default async function LoginPage() {
         </div>
         <div className="relative space-y-6">
           <h1 className="text-4xl font-semibold leading-tight tracking-tight">
-            The operating system for modern multi-branch clinics.
+            Dr. Bhosikar&apos;s Rheumatology Clinic
           </h1>
           <p className="max-w-md text-primary-foreground/80">
-            Appointments, EMR, prescriptions, billing, inventory and analytics —
-            unified across every branch, doctor and patient.
+            Joint pain and backpain care — appointments, EMR, prescriptions,
+            billing and inventory, all in one place.
           </p>
           <ul className="grid max-w-md grid-cols-2 gap-3 text-sm text-primary-foreground/85">
             {[
-              "Multi-branch management",
               "Electronic medical records",
               "Smart appointment queue",
+              "Rheumatology prescriptions",
               "GST-ready billing",
               "WhatsApp & email reminders",
               "Real-time analytics",

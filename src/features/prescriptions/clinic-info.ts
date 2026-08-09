@@ -1,5 +1,5 @@
-import { branches, doctors, patients } from "@/server/demo/data";
-import { getRxDesign } from "@/server/demo/rx-design-store";
+import { db } from "@/server/repositories";
+import { getRxDesignFor, type RxDesign } from "@/server/demo/rx-design-store";
 import type { ClinicInfo, RxPatientInfo } from "./prescription-detail";
 import type { Prescription } from "@/types/domain";
 
@@ -9,20 +9,23 @@ import type { Prescription } from "@/types/domain";
  * credentials, patient identity block, and the prescribing doctor's own
  * design (header/footer/accent/language).
  */
-export function clinicInfoFor(rx: Prescription): {
+export async function clinicInfoFor(rx: Prescription): Promise<{
   clinic: ClinicInfo;
   doctorMeta?: string;
   patient?: RxPatientInfo;
-  design: ReturnType<typeof getRxDesign>;
-} {
-  const branch = branches.find((b) => b.id === rx.branchId);
-  const doctor = doctors.find((d) => d.id === rx.doctorId);
-  const patient = patients.find((p) => p.id === rx.patientId);
+  design: RxDesign;
+}> {
+  const [branch, doctor, patient, design] = await Promise.all([
+    db.branches.get(rx.branchId),
+    db.doctors.get(rx.doctorId),
+    db.patients.get(rx.patientId),
+    getRxDesignFor(rx.doctorId),
+  ]);
 
   return {
     clinic: {
-      name: branch?.name ?? "Clinicore",
-      address: [branch?.city].filter(Boolean).join(", ") || "Bengaluru, India",
+      name: branch?.name ?? "Clinic",
+      address: [branch?.city].filter(Boolean).join(", ") || "",
       phone: branch?.phone ?? "",
       gst: branch?.gstNumber ?? undefined,
     },
@@ -38,6 +41,6 @@ export function clinicInfoFor(rx: Prescription): {
           allergies: patient.allergies,
         }
       : undefined,
-    design: getRxDesign(rx.doctorId),
+    design,
   };
 }

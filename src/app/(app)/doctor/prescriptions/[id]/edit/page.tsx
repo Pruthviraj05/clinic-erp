@@ -4,10 +4,9 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requirePermission } from "@/lib/guard";
 import { getPrescription, listPrescriptions } from "@/server/services/prescriptions.service";
-import { appointments, doctors, medicines, patients } from "@/server/demo/data";
-import { rxTemplates } from "@/server/demo/template-store";
+import { db } from "@/server/repositories";
+import { getRxTemplatesFor } from "@/server/demo/template-store";
 import { groupsForDoctor } from "@/server/demo/disease-store";
-import { prescriptionTemplate } from "@/server/demo/settings-store";
 import { labTests, investigations as investigationMaster } from "@/server/demo/extra";
 import { clinicFromBranch } from "@/lib/clinic";
 import { ConsultScreen } from "@/features/consult/consult-screen";
@@ -24,18 +23,20 @@ export default async function EditPrescriptionPage({ params }: { params: Promise
 
   const rx = await getPrescription(id);
   if (!rx) notFound();
-  const patient = patients.find((p) => p.id === rx.patientId);
+  const patient = await db.patients.get(rx.patientId);
   if (!patient) notFound();
 
   // The consult screen is appointment-shaped; reuse the originating appointment
   // when we can still find it, else synthesize a read-only stand-in.
-  const source = appointments.find(
+  const allAppointments = await db.appointments.list();
+  const source = allAppointments.find(
     (a) => a.patientId === rx.patientId && a.doctorId === rx.doctorId,
   );
+  const clinic = await clinicFromBranch(rx.branchId);
   const appointment: Appointment = source ?? {
     id: `rx-${rx.id}`,
     branchId: rx.branchId,
-    branchName: clinicFromBranch(rx.branchId).name,
+    branchName: clinic.name,
     patientId: rx.patientId,
     patientName: rx.patientName,
     patientMrn: patient.mrn,
@@ -50,8 +51,12 @@ export default async function EditPrescriptionPage({ params }: { params: Promise
     paymentStatus: "PAID",
   };
 
-  const history = (await listPrescriptions(user, patient.id)).filter((p) => p.id !== rx.id);
-  const doctor = doctors.find((d) => d.id === rx.doctorId);
+  const [history, doctor, templates, medicines] = await Promise.all([
+    listPrescriptions(user, patient.id).then((rows) => rows.filter((p) => p.id !== rx.id)),
+    db.doctors.get(rx.doctorId),
+    getRxTemplatesFor(user.linkId ?? user.id),
+    db.medicines.list(),
+  ]);
   const doctorMeta = [doctor?.qualifications, doctor?.registrationNo ? `Reg. ${doctor.registrationNo}` : null]
     .filter(Boolean)
     .join(" · ");
@@ -59,6 +64,7 @@ export default async function EditPrescriptionPage({ params }: { params: Promise
   const investigationSuggestions = [
     ...new Set([...labTests, ...investigationMaster].filter((r) => r.active).map((r) => r.name)),
   ];
+  const diseaseGroups = await groupsForDoctor(rx.doctorId);
 
   return (
     <div className="space-y-4">
@@ -76,14 +82,14 @@ export default async function EditPrescriptionPage({ params }: { params: Promise
         appointment={appointment}
         patient={patient}
         history={history}
-        templates={rxTemplates.filter((t) => !t.doctorId || t.doctorId === user.id)}
+        templates={templates}
         drugOptions={medicines.filter((m) => m.isActive).map((m) => ({ name: m.name, sublabel: m.category ?? undefined }))}
         diagnosisSuggestions={DIAGNOSIS_SUGGESTIONS}
         investigationSuggestions={investigationSuggestions}
-        clinic={clinicFromBranch(rx.branchId)}
+        clinic={clinic}
         doctorMeta={doctorMeta || undefined}
-        rxSettings={{ ...prescriptionTemplate }}
-        diseaseGroups={groupsForDoctor(rx.doctorId).map((g) => ({
+        rxSettings={await db.settings.get()}
+        diseaseGroups={diseaseGroups.map((g) => ({
           id: g.id,
           name: g.name,
           hasPatient: g.patientIds.includes(patient.id),

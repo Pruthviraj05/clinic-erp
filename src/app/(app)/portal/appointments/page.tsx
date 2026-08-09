@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requireRole } from "@/lib/guard";
-import { appointments, branches, doctors, patients, PORTAL_PATIENT_ID } from "@/server/demo/data";
+import { db } from "@/server/repositories";
 import { PageHeader } from "@/components/shared/page-header";
 import { AppointmentsView } from "@/features/appointments/appointments-view";
 
@@ -11,11 +11,17 @@ export default async function PortalAppointmentsPage({
 }: {
   searchParams: Promise<{ new?: string }>;
 }) {
-  await requireRole("PATIENT");
+  const { user } = await requireRole("PATIENT");
   const { new: openBook } = await searchParams;
-  const me = patients.find((p) => p.id === PORTAL_PATIENT_ID)!;
-  const mine = appointments
-    .filter((a) => a.patientId === PORTAL_PATIENT_ID)
+  const [allPatients, allAppointments, branches, doctors] = await Promise.all([
+    db.patients.list(),
+    db.appointments.list(),
+    db.branches.list(),
+    db.doctors.list(),
+  ]);
+  const me = allPatients.find((p) => p.id === user.linkId)!;
+  const mine = allAppointments
+    .filter((a) => a.patientId === user.linkId)
     .sort((a, b) => b.scheduledStart.localeCompare(a.scheduledStart));
 
   return (

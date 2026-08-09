@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireRole } from "@/lib/guard";
 import { getInvoice } from "@/server/services/billing.service";
-import { PORTAL_PATIENT_ID } from "@/server/demo/data";
 import { InvoiceDetail } from "@/features/billing/invoice-detail";
 import { clinicFromBranch } from "@/lib/clinic";
 
@@ -14,13 +13,14 @@ export default async function PortalInvoiceDetailPage({ params }: { params: Prom
   const { user } = await requireRole("PATIENT");
   const { id } = await params;
   const invoice = await getInvoice(user, id);
-  if (!invoice || invoice.patientId !== PORTAL_PATIENT_ID) notFound();
+  if (!invoice || invoice.patientId !== user.linkId) notFound();
+  const clinic = await clinicFromBranch(invoice.branchId);
   return (
     <div className="space-y-4">
       <Link href="/portal/billing" className="print-hide inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="size-4" /> Back to bills
       </Link>
-      <InvoiceDetail invoice={invoice} clinic={clinicFromBranch(invoice.branchId)} />
+      <InvoiceDetail invoice={invoice} clinic={clinic} />
     </div>
   );
 }

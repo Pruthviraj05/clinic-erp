@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { requireRole } from "@/lib/guard";
 import { listAppointments } from "@/server/services/appointments.service";
-import { branches, doctors, patients } from "@/server/demo/data";
+import { db } from "@/server/repositories";
 import { PageHeader } from "@/components/shared/page-header";
 import { AppointmentsView } from "@/features/appointments/appointments-view";
 
@@ -9,9 +9,13 @@ export const metadata: Metadata = { title: "Appointments" };
 
 export default async function DoctorAppointmentsPage() {
   const { user } = await requireRole("DOCTOR");
-  const appointments = await listAppointments(user, { range: "all" });
-  // The demo doctor is Dr. Ananya Mehta (doc_mehta).
-  const self = doctors.find((d) => d.userId === user.id) ?? doctors[0];
+  const [appointments, branches, doctors, patients] = await Promise.all([
+    listAppointments(user, { range: "all" }),
+    db.branches.list(),
+    db.doctors.list(),
+    db.patients.list(),
+  ]);
+  const self = doctors.find((d) => d.id === user.linkId) ?? doctors[0];
   const myBranches = branches.filter((b) => self.branchIds.includes(b.id));
 
   return (

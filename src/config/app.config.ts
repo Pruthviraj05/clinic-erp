@@ -6,7 +6,7 @@
 export const appConfig = {
   name: "Clinicore",
   shortName: "Clinicore",
-  description: "Enterprise multi-branch clinic management system",
+  description: "Clinic management system for Dr. Bhosikar's Rheumatology Clinic",
   version: "0.1.0",
   // Data source for this build. Until a real MONGODB_URI is wired up we serve
   // a structured demo dataset so the UI renders end-to-end. Switching to
@@ -20,7 +20,7 @@ export const appConfig = {
   defaultLocale: "en-IN",
   defaultTimezone: "Asia/Kolkata",
   support: {
-    email: "support@clinicore.app",
+    email: "doctor@bhosikarrheumatology.in", // PLACEHOLDER — confirm real support contact
   },
 } as const;
 

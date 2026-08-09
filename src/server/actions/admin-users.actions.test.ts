@@ -11,12 +11,18 @@ vi.mock("next/headers", () => ({
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
 const { createAdminAction, setUserActiveAction } = await import("./admin-users.actions");
-const { users, findUserByEmail, verifyPassword } = await import("@/server/demo/users-store");
+const { verifyPassword } = await import("@/server/demo/users-store");
+const { db } = await import("@/server/repositories");
 
 function fd(values: Record<string, string>): FormData {
   const form = new FormData();
   for (const [k, v] of Object.entries(values)) form.append(k, v);
   return form;
+}
+
+async function findByEmail(email: string) {
+  const accounts = await db.users.list();
+  return accounts.find((u) => u.email.toLowerCase() === email.toLowerCase());
 }
 
 beforeEach(() => {
@@ -31,7 +37,7 @@ describe("admin creates admin", () => {
     );
     expect(res.ok).toBe(true);
 
-    const created = findUserByEmail("priya.admin@clinicore.app")!;
+    const created = (await findByEmail("priya.admin@clinicore.app"))!;
     expect(created.role).toBe("ADMIN");
     expect(created.isActive).toBe(true);
     expect(created.passwordHash).not.toContain("Strong@123");
@@ -58,19 +64,22 @@ describe("admin creates admin", () => {
   });
 
   it("deactivates and reactivates an account", async () => {
-    const target = findUserByEmail("priya.admin@clinicore.app")!;
+    const target = (await findByEmail("priya.admin@clinicore.app"))!;
     expect((await setUserActiveAction(target.id, false)).ok).toBe(true);
-    expect(target.isActive).toBe(false);
+    expect((await db.users.get(target.id))!.isActive).toBe(false);
     expect((await setUserActiveAction(target.id, true)).ok).toBe(true);
-    expect(target.isActive).toBe(true);
+    expect((await db.users.get(target.id))!.isActive).toBe(true);
   });
 
   it("never leaves the clinic without an active administrator", async () => {
-    const admins = users.filter((u) => u.role === "ADMIN" && u.isActive);
-    // Deactivate all but one, then the last one must be refused.
+    // ADMIN_SEED_USER (admin@gmail.com) plus the "priya.admin" account created
+    // above are both active admins at this point.
+    const admins = (await db.users.list()).filter((u) => u.role === "ADMIN" && u.isActive);
+    expect(admins.length).toBeGreaterThan(1);
     for (const a of admins.slice(1)) await setUserActiveAction(a.id, false);
-    const last = users.filter((u) => u.role === "ADMIN" && u.isActive)[0];
-    const res = await setUserActiveAction(last.id, false);
+    const remaining = (await db.users.list()).filter((u) => u.role === "ADMIN" && u.isActive);
+    expect(remaining).toHaveLength(1);
+    const res = await setUserActiveAction(remaining[0].id, false);
     expect(res.ok).toBe(false);
     expect(res.message).toMatch(/at least one active administrator/i);
   });

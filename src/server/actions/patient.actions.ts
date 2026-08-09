@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { authorize } from "@/lib/guard";
-import { patients } from "@/server/demo/data";
 import { db } from "@/server/repositories";
 import { logAudit } from "@/server/demo/extra";
+import { hashPassword } from "@/server/demo/users-store";
 import { createPatientSchema, updatePatientSchema } from "@/features/patients/schema";
 import type { ActionResult } from "./appointment.actions";
 import type { Patient } from "@/types/domain";
@@ -21,17 +21,21 @@ function revalidatePatients(id?: string) {
   }
 }
 
-/**
- * Register a patient. Generates the next MRN.
- * DEMO MODE: appends to the in-memory list. PRISMA MODE: repository.create with
- * an MRN sequence per organization inside a transaction.
- */
+function randomTempPassword(): string {
+  // 10 random alnum chars + a guaranteed digit/symbol so it always passes the
+  // "letter + number" password policy used elsewhere in the app.
+  const raw = Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 6);
+  return `${raw}9!`;
+}
+
+/** Register a patient. Generates the next MRN; auto-creates a portal login if an email was given. */
 export async function createPatientAction(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult<Patient>> {
   const authz = await authorize("patients", "create");
   if (!authz.ok) return authz;
+  const { user } = authz.session;
 
   const parsed = createPatientSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
@@ -41,7 +45,8 @@ export async function createPatientAction(
 
   // Next MRN = max existing + 1 (length-based math breaks once rows are
   // removed or seeds change).
-  const nextSeq = patients.reduce((max, p) => {
+  const existingPatients = await db.patients.list();
+  const nextSeq = existingPatients.reduce((max, p) => {
     const n = Number(p.mrn.replace(/\D/g, ""));
     return Number.isFinite(n) && n > max ? n : max;
   }, 100233) + 1;
@@ -63,12 +68,45 @@ export async function createPatientAction(
     lastVisitAt: null,
     isActive: true,
   };
-  patients.push(patient);
+  await db.patients.insert(patient);
 
-  revalidatePath("/admin/patients");
-  revalidatePath("/reception/patients");
-  revalidatePath("/doctor/patients");
-  return { ok: true, message: `Registered ${patient.fullName} (${patient.mrn}).`, data: patient };
+  // Auto-create a portal login when an email is on file — reception/the
+  // doctor hands the temp password to the patient (shown once in the toast).
+  let portalPassword: string | undefined;
+  if (patient.email) {
+    const accounts = await db.users.list();
+    const emailTaken = accounts.some((a) => a.email.toLowerCase() === patient.email!.toLowerCase());
+    if (!emailTaken) {
+      portalPassword = randomTempPassword();
+      await db.users.insert({
+        id: `usr_${Date.now().toString(36)}`,
+        fullName: patient.fullName,
+        email: patient.email,
+        role: "PATIENT",
+        passwordHash: hashPassword(portalPassword),
+        linkId: patient.id,
+        isActive: true,
+        createdAt: patient.createdAt,
+      });
+    }
+  }
+
+  await logAudit({
+    actor: user.fullName,
+    role: user.role,
+    action: "CREATE",
+    entity: "Patient",
+    summary: `Registered ${patient.fullName} (${patient.mrn})`,
+  });
+
+  revalidatePatients();
+  return {
+    ok: true,
+    message: portalPassword
+      ? `Registered ${patient.fullName} (${patient.mrn}). Portal login: ${patient.email} / ${portalPassword}`
+      : `Registered ${patient.fullName} (${patient.mrn}).`,
+    data: patient,
+  };
 }
 
 /**
@@ -106,7 +144,7 @@ export async function updatePatientAction(
   });
   if (!updated) return { ok: false, message: "Patient not found." };
 
-  logAudit({
+  await logAudit({
     actor: authz.session.user.fullName,
     role: authz.session.user.role,
     action: "UPDATE",
@@ -128,7 +166,7 @@ export async function setPatientActiveAction(
   const updated = await db.patients.update(id, { isActive: active });
   if (!updated) return { ok: false, message: "Patient not found." };
 
-  logAudit({
+  await logAudit({
     actor: authz.session.user.fullName,
     role: authz.session.user.role,
     action: "STATUS_CHANGE",
