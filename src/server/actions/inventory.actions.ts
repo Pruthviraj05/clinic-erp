@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { newId } from "@/lib/ids";
 import { authorize } from "@/lib/guard";
 import { addMedicine, applyStockChange, lowStockItems, updateMedicine } from "@/server/demo/inventory-store";
 import { db } from "@/server/repositories";
@@ -222,7 +223,7 @@ export async function sendLowStockAlertAction(): Promise<ActionResult<{ count: n
   const now = new Date().toISOString();
   for (const m of low) {
     await db.notifications.insert({
-      id: `ntf_low_${m.id}_${Date.now()}`,
+      id: newId("ntf"),
       type: "INVENTORY_LOW_STOCK",
       channel: "WHATSAPP",
       title: "Low stock alert sent",

@@ -1,7 +1,7 @@
 import "server-only";
 import type { Collection, Document } from "mongodb";
 import { getDb } from "./mongo-client";
-import type { EntityStore, SingletonStore, StoragePort } from "./storage-port";
+import type { CounterStore, EntityStore, SingletonStore, StoragePort } from "./storage-port";
 import type { PrescriptionTemplate } from "@/server/demo/settings-store";
 
 /**
@@ -30,12 +30,52 @@ function stripId<T>(doc: (T & { _id?: unknown }) | null): T | null {
   return rest as T;
 }
 
+/**
+ * Fields large enough to blow up a list response. Base64 uploads live inline
+ * on the document (there is no object storage yet), so a few hundred rows can
+ * be gigabytes. They are projected out of every multi-row read and fetched
+ * only by `get(id)` on a detail screen.
+ */
+const BLOB_FIELDS = ["billPhotoDataUrl", "fileDataUrl", "signatureDataUrl"];
+
+function blobProjection(): Record<string, 0> {
+  return Object.fromEntries(BLOB_FIELDS.map((f) => [f, 0])) as Record<string, 0>;
+}
+
 function mongoStore<T extends { id: string }>(collectionName: string): EntityStore<T> {
   return {
     async list(filter) {
       const col = await collectionFor<T & Document>(collectionName);
-      const rows = (await col.find({}, { projection: { _id: 0 } }).toArray()) as T[];
+      const rows = (await col
+        .find({}, { projection: { _id: 0, ...blobProjection() } })
+        .toArray()) as T[];
       return filter ? rows.filter(filter) : rows;
+    },
+    async find(query = {}, options = {}) {
+      const col = await collectionFor<T & Document>(collectionName);
+      const omit = Object.fromEntries((options.omit ?? []).map((f) => [f, 0]));
+      let cursor = col.find(query as never, {
+        projection: { _id: 0, ...blobProjection(), ...omit },
+      });
+      if (options.sort) cursor = cursor.sort(options.sort);
+      if (options.skip) cursor = cursor.skip(options.skip);
+      if (options.limit) cursor = cursor.limit(options.limit);
+      return (await cursor.toArray()) as T[];
+    },
+    async count(query = {}) {
+      const col = await collectionFor<T & Document>(collectionName);
+      return col.countDocuments(query as never);
+    },
+    async insertMany(rows) {
+      if (!rows.length) return 0;
+      const col = await collectionFor<T & Document>(collectionName);
+      const res = await col.insertMany(rows.map((r) => ({ ...r })) as never);
+      return res.insertedCount;
+    },
+    async updateMany(query, patch) {
+      const col = await collectionFor<T & Document>(collectionName);
+      const res = await col.updateMany(query as never, { $set: patch as never });
+      return res.modifiedCount;
     },
     async get(id) {
       const col = await collectionFor<T & Document>(collectionName);
@@ -72,6 +112,29 @@ function mastersStoreFor(group: string): EntityStore<import("@/server/demo/extra
       const col = await collectionFor<Row>("masters");
       const rows = (await col.find({ group }, { projection: { _id: 0, group: 0 } }).toArray()) as Row[];
       return filter ? rows.filter(filter) : rows;
+    },
+    async find(query = {}, options = {}) {
+      const col = await collectionFor<Row>("masters");
+      let cursor = col.find({ ...query, group } as never, { projection: { _id: 0, group: 0 } });
+      if (options.sort) cursor = cursor.sort(options.sort);
+      if (options.skip) cursor = cursor.skip(options.skip);
+      if (options.limit) cursor = cursor.limit(options.limit);
+      return (await cursor.toArray()) as Row[];
+    },
+    async count(query = {}) {
+      const col = await collectionFor<Row>("masters");
+      return col.countDocuments({ ...query, group } as never);
+    },
+    async insertMany(rows) {
+      if (!rows.length) return 0;
+      const col = await collectionFor<Row>("masters");
+      const res = await col.insertMany(rows.map((r) => ({ ...r, group })) as never);
+      return res.insertedCount;
+    },
+    async updateMany(query, patch) {
+      const col = await collectionFor<Row>("masters");
+      const res = await col.updateMany({ ...query, group } as never, { $set: patch as never });
+      return res.modifiedCount;
     },
     async get(id) {
       const col = await collectionFor<Row>("masters");
@@ -131,6 +194,34 @@ const settingsStore: SingletonStore<PrescriptionTemplate> = {
   },
 };
 
+/**
+ * Atomic sequences. `findOneAndUpdate` with `$inc` is a single round-trip and
+ * a single document write, so two concurrent callers can never receive the
+ * same number — unlike deriving one from `collection.length`.
+ */
+const counterStore: CounterStore = {
+  async next(key) {
+    const db = await getDb();
+    const res = await db
+      .collection<{ _id: string; seq: number }>("counters")
+      .findOneAndUpdate(
+        { _id: key },
+        { $inc: { seq: 1 } },
+        { upsert: true, returnDocument: "after" },
+      );
+    return res?.seq ?? 1;
+  },
+  async ensureAtLeast(key, value) {
+    const db = await getDb();
+    await db
+      .collection<{ _id: string; seq: number }>("counters")
+      .updateOne({ _id: key, seq: { $lt: value } }, { $set: { seq: value } }, { upsert: false });
+    await db
+      .collection<{ _id: string; seq: number }>("counters")
+      .updateOne({ _id: key }, { $setOnInsert: { seq: value } }, { upsert: true });
+  },
+};
+
 export const mongodbAdapter: StoragePort = {
   patients: mongoStore("patients"),
   appointments: mongoStore("appointments"),
@@ -151,4 +242,5 @@ export const mongodbAdapter: StoragePort = {
   diseaseGroups: mongoStore("disease_groups"),
   masters: Object.fromEntries(MASTER_GROUP_KEYS.map((g) => [g, mastersStoreFor(g)])),
   settings: settingsStore,
+  counters: counterStore,
 };

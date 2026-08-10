@@ -16,8 +16,9 @@ export async function authenticate(
   password: string,
 ): Promise<{ ok: true; user: UserAccount } | { ok: false; message: string }> {
   const normalized = email.trim().toLowerCase();
-  const accounts = await db.users.list();
-  const user = accounts.find((u) => u.email.toLowerCase() === normalized);
+  // Indexed lookup, not a full scan: loading every account (and every password
+  // hash) into memory on each login attempt made login a DoS amplifier.
+  const [user] = await db.users.find({ email: normalized }, { limit: 1 });
   if (!user || !user.isActive) {
     return { ok: false, message: "No active account found for that email." };
   }

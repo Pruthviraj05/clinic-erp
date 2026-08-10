@@ -13,9 +13,9 @@ export const metadata: Metadata = { title: "Prescription" };
 export default async function PortalPrescriptionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { user } = await requireRole("PATIENT");
   const { id } = await params;
-  const rx = await getPrescription(id);
   // A patient may only view their own prescriptions.
-  if (!rx || rx.patientId !== user.linkId) notFound();
+  const rx = await getPrescription(id, user);
+  if (!rx) notFound();
   const { clinic, doctorMeta, patient, design } = await clinicInfoFor(rx);
   const qrDataUrl = await generateQrDataUrl(`https://clinicore.app/verify/rx/${rx.id}`);
   return (

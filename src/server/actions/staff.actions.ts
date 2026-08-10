@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { newId } from "@/lib/ids";
 import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
 import { logAudit } from "@/server/demo/extra";
@@ -19,6 +20,24 @@ function randomTempPassword(): string {
  * email isn't already in use. Returns the temp password so the caller can
  * surface it once (the admin hands it to the new doctor/receptionist).
  */
+/**
+ * Keep the linked login account in step with the staff record.
+ *
+ * `resolveRealUser` authorises against the *users* row, so flipping only the
+ * Doctor/Receptionist row would show "Deactivated" in the UI while the person
+ * could still sign in. Email and branch matter for the same reason: login
+ * matches on the users row, and branch scoping reads `account.branchId`.
+ */
+async function syncLinkedAccount(
+  linkId: string,
+  patch: { isActive?: boolean; email?: string; fullName?: string; branchId?: string },
+): Promise<void> {
+  const accounts = await db.users.list((u) => u.linkId === linkId);
+  for (const account of accounts) {
+    await db.users.update(account.id, patch);
+  }
+}
+
 async function createStaffAccount(
   role: "DOCTOR" | "RECEPTIONIST",
   fullName: string,
@@ -26,13 +45,15 @@ async function createStaffAccount(
   linkId: string,
   branchId?: string,
 ): Promise<string | undefined> {
-  const accounts = await db.users.list();
-  if (accounts.some((a) => a.email.toLowerCase() === email.toLowerCase())) return undefined;
+  // Stored lower-cased so the indexed login lookup matches.
+  const normalized = email.trim().toLowerCase();
+  const existing = await db.users.find({ email: normalized }, { limit: 1 });
+  if (existing.length) return undefined;
   const password = randomTempPassword();
   await db.users.insert({
-    id: `usr_${Date.now().toString(36)}`,
+    id: newId("usr"),
     fullName,
-    email,
+    email: normalized,
     role,
     passwordHash: hashPassword(password),
     linkId,
@@ -67,7 +88,7 @@ export async function createBranchAction(
   const input = parsed.data;
 
   const branch: Branch = {
-    id: `br_${Date.now()}`,
+    id: newId("br"),
     name: input.name,
     code: input.code,
     city: input.city || null,
@@ -160,7 +181,7 @@ export async function createDoctorAction(
   }
   const input = parsed.data;
 
-  const id = `doc_${Date.now()}`;
+  const id = newId("doc");
   const doctor: Doctor = {
     id,
     userId: `usr_${id}`,
@@ -222,6 +243,9 @@ export async function updateDoctorAction(
     branchIds: input.branchIds,
   });
   if (!updated) return { ok: false, message: "Doctor not found." };
+  // Login matches on the users row, so a changed email must propagate or the
+  // doctor is locked out of their own account.
+  await syncLinkedAccount(id, { email: updated.email.trim().toLowerCase(), fullName: updated.fullName });
 
   await logAudit({
     actor: authz.session.user.fullName,
@@ -238,9 +262,11 @@ export async function setDoctorActiveAction(id: string, active: boolean): Promis
   const authz = await authorize("doctors", active ? "edit" : "delete");
   if (!authz.ok) return authz;
 
-  // Deactivation only flips the flag — the doctor's appointments are kept.
+  // Deactivation keeps the doctor's appointments, but must also revoke the
+  // login — otherwise they can still sign in after being deactivated.
   const updated = await db.doctors.update(id, { isActive: active });
   if (!updated) return { ok: false, message: "Doctor not found." };
+  await syncLinkedAccount(id, { isActive: active });
 
   await logAudit({
     actor: authz.session.user.fullName,
@@ -271,7 +297,7 @@ export async function createReceptionistAction(
   const branch = await db.branches.get(input.branchId);
   if (!branch) return { ok: false, message: "Invalid branch." };
 
-  const id = `rec_${Date.now()}`;
+  const id = newId("rec");
   const receptionist: Receptionist = {
     id,
     userId: `usr_${id}`,
@@ -331,6 +357,13 @@ export async function updateReceptionistAction(
     employeeCode: input.employeeCode || null,
   });
   if (!updated) return { ok: false, message: "Receptionist not found." };
+  // Email drives login; branchId drives what they can see. Both live on the
+  // users row, so both have to follow the staff record.
+  await syncLinkedAccount(id, {
+    email: updated.email.trim().toLowerCase(),
+    fullName: updated.fullName,
+    branchId: updated.branchId,
+  });
 
   await logAudit({
     actor: authz.session.user.fullName,
@@ -349,6 +382,7 @@ export async function setReceptionistActiveAction(id: string, active: boolean): 
 
   const updated = await db.receptionists.update(id, { isActive: active });
   if (!updated) return { ok: false, message: "Receptionist not found." };
+  await syncLinkedAccount(id, { isActive: active });
 
   await logAudit({
     actor: authz.session.user.fullName,

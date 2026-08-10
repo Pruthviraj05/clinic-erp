@@ -26,6 +26,17 @@ import { db } from "@/server/repositories";
 export const SESSION_COOKIE = "clinicore_session";
 export const DEMO_ROLE_COOKIE = "clinicore_role";
 
+/**
+ * The demo role-switcher hands out a full session with no password. It is a
+ * development convenience ONLY: once real credentials are in use, or in a
+ * production build, it must not exist — otherwise anyone who knows the URL
+ * can sign in as ADMIN and read every patient record.
+ */
+export function isDemoLoginEnabled(): boolean {
+  if (process.env.NEXT_PUBLIC_AUTH_MODE === "credentials") return false;
+  return process.env.NODE_ENV !== "production";
+}
+
 export interface SessionUser {
   id: string;
   fullName: string;
@@ -114,11 +125,14 @@ export const getSession = cache(async (): Promise<Session | null> => {
     }
   }
 
-  // Hidden dev fallback — see /dev-login (not linked from the real login page).
-  const demoRole = store.get(DEMO_ROLE_COOKIE)?.value as Role | undefined;
-  if (demoRole) {
-    const user = getDemoUserByRole(demoRole);
-    if (user) return { user };
+  // Dev-only fallback — see /dev-login. Refused outright once real
+  // credentials are in use, so a stale cookie cannot grant a session.
+  if (isDemoLoginEnabled()) {
+    const demoRole = store.get(DEMO_ROLE_COOKIE)?.value as Role | undefined;
+    if (demoRole) {
+      const user = getDemoUserByRole(demoRole);
+      if (user) return { user };
+    }
   }
 
   return null;

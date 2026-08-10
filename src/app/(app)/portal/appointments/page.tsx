@@ -19,10 +19,13 @@ export default async function PortalAppointmentsPage({
     db.branches.list(),
     db.doctors.list(),
   ]);
-  const me = allPatients.find((p) => p.id === user.linkId)!;
-  const mine = allAppointments
-    .filter((a) => a.patientId === user.linkId)
-    .sort((a, b) => b.scheduledStart.localeCompare(a.scheduledStart));
+  // Degrade instead of throwing if the account is not linked to a patient.
+  const me = allPatients.find((p) => p.id === user.linkId);
+  const mine = user.linkId
+    ? allAppointments
+        .filter((a) => a.patientId === user.linkId)
+        .sort((a, b) => b.scheduledStart.localeCompare(a.scheduledStart))
+    : [];
 
   return (
     <div>
@@ -32,10 +35,10 @@ export default async function PortalAppointmentsPage({
         branches={branches.map((b) => ({ id: b.id, label: b.name }))}
         doctors={doctors.map((d) => ({ id: d.id, label: d.fullName, sublabel: d.specialization ?? undefined }))}
         patients={[]}
-        canBook
+        canBook={Boolean(me)}
         canManage={false}
-        fixedPatient={{ id: me.id, label: me.fullName, sublabel: me.mrn }}
-        autoOpenBook={openBook === "1"}
+        fixedPatient={me ? { id: me.id, label: me.fullName, sublabel: me.mrn } : undefined}
+        autoOpenBook={openBook === "1" && Boolean(me)}
       />
     </div>
   );

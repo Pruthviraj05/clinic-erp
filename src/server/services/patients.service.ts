@@ -3,18 +3,23 @@ import { db } from "@/server/repositories";
 import type { Appointment, Invoice, Patient, Prescription } from "@/types/domain";
 import type { MedicalRecordItem } from "@/server/demo/extra";
 
-export async function listPatients(search?: string): Promise<Patient[]> {
-  let rows = await db.patients.list();
-  if (search) {
-    const q = search.toLowerCase();
-    rows = rows.filter(
-      (p) =>
-        p.fullName.toLowerCase().includes(q) ||
-        p.mrn.toLowerCase().includes(q) ||
-        p.phone.includes(q),
-    );
-  }
-  return rows.sort((a, b) => a.fullName.localeCompare(b.fullName));
+/** Escape user input before it becomes a regex — otherwise "(" throws. */
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export async function listPatients(search?: string, limit = 500): Promise<Patient[]> {
+  const term = search?.trim();
+  const query = term
+    ? {
+        $or: [
+          { fullName: { $regex: escapeRegex(term) } },
+          { mrn: { $regex: escapeRegex(term) } },
+          { phone: { $regex: escapeRegex(term) } },
+        ],
+      }
+    : {};
+  return db.patients.find(query, { sort: { fullName: 1 }, limit });
 }
 
 export async function getPatient(id: string): Promise<Patient | null> {
@@ -29,20 +34,19 @@ export interface PatientBundle {
   records: MedicalRecordItem[];
 }
 
+/**
+ * One patient's chart. Every query is pushed into the database and bounded —
+ * this used to fetch four ENTIRE collections and filter them in memory, which
+ * on a real dataset means transferring hundreds of MB to render ~40 rows.
+ */
 export async function getPatientBundle(id: string): Promise<PatientBundle | null> {
   const patient = await db.patients.get(id);
   if (!patient) return null;
   const [appointments, prescriptions, invoices, records] = await Promise.all([
-    db.appointments.list((a) => a.patientId === id),
-    db.prescriptions.list((p) => p.patientId === id),
-    db.invoices.list((i) => i.patientId === id),
-    db.medicalRecords.list((r) => r.patientId === id),
+    db.appointments.find({ patientId: id }, { sort: { scheduledStart: -1 }, limit: 200 }),
+    db.prescriptions.find({ patientId: id }, { sort: { createdAt: -1 }, limit: 200 }),
+    db.invoices.find({ patientId: id }, { sort: { createdAt: -1 }, limit: 200 }),
+    db.medicalRecords.find({ patientId: id }, { sort: { recordedAt: -1 }, limit: 200 }),
   ]);
-  return {
-    patient,
-    appointments: appointments.sort((a, b) => b.scheduledStart.localeCompare(a.scheduledStart)),
-    prescriptions: prescriptions.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    invoices: invoices.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    records: records.sort((a, b) => b.recordedAt.localeCompare(a.recordedAt)),
-  };
+  return { patient, appointments, prescriptions, invoices, records };
 }

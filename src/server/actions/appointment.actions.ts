@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { newId } from "@/lib/ids";
 import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
 import { logAudit } from "@/server/demo/extra";
@@ -64,7 +65,7 @@ export async function createAppointmentAction(
   );
 
   const appt: Appointment = {
-    id: `apt_${Date.now()}`,
+    id: newId("apt"),
     branchId: branch.id,
     branchName: branch.name,
     patientId: patient.id,
@@ -108,6 +109,12 @@ export async function updateAppointmentStatusAction(
   const parsed = updateStatusSchema.safeParse({ id, status });
   if (!parsed.success) return { ok: false, message: "Invalid status change." };
 
+  const existing = await db.appointments.get(id);
+  if (!existing) return { ok: false, message: "Appointment not found." };
+  if (user.role === "DOCTOR" && existing.doctorId !== user.linkId) {
+    return { ok: false, message: "You can only change your own appointments." };
+  }
+
   const updated = await db.appointments.update(id, { status });
   if (!updated) return { ok: false, message: "Appointment not found." };
 
@@ -144,6 +151,9 @@ export async function rescheduleAppointmentAction(
 
   const appt = await db.appointments.get(input.id);
   if (!appt) return { ok: false, message: "Appointment not found." };
+  if (authz.session.user.role === "DOCTOR" && appt.doctorId !== authz.session.user.linkId) {
+    return { ok: false, message: "You can only reschedule your own appointments." };
+  }
 
   const start = new Date(`${input.date}T${input.time}`);
   if (Number.isNaN(start.getTime())) {

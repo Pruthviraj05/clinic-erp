@@ -25,7 +25,13 @@ function createClientPromise(): Promise<MongoClient> {
     );
   }
   const client = new MongoClient(uri, {
-    maxPoolSize: 10,
+    // Pool size is PER serverless instance. Vercel can run hundreds of them
+    // concurrently, and an Atlas M10 caps out at 1,500 connections — so a
+    // generous per-instance pool is what exhausts the cluster during a
+    // cold-start burst. Keep it small and let idle instances release.
+    maxPoolSize: 5,
+    minPoolSize: 0,
+    maxIdleTimeMS: 30_000,
     serverSelectionTimeoutMS: 10_000,
   });
   return client.connect();

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { newId } from "@/lib/ids";
 import { z } from "zod";
 import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
@@ -42,7 +43,6 @@ const consultPayloadSchema = z.object({
 
 export type ConsultPayload = z.infer<typeof consultPayloadSchema>;
 
-let rxSeq = 100;
 
 /**
  * Save a consultation: creates the Prescription, completes the appointment and
@@ -63,6 +63,11 @@ export async function createPrescriptionAction(
 
   const appt = await db.appointments.get(input.appointmentId);
   if (!appt) return { ok: false, message: "Appointment not found." };
+  // The prescription is filed under the appointment's doctor, so a doctor
+  // must not be able to write one against someone else's appointment.
+  if (user.role === "DOCTOR" && appt.doctorId !== user.linkId) {
+    return { ok: false, message: "You can only record a consultation for your own appointments." };
+  }
   if (input.diagnoses.length === 0 && input.medicines.length === 0) {
     return { ok: false, message: "Add at least a diagnosis or a medicine before saving." };
   }
@@ -74,7 +79,7 @@ export async function createPrescriptionAction(
 
   const now = new Date().toISOString();
   const rx: Prescription = {
-    id: `rx_${String(rxSeq++).padStart(3, "0")}_${Date.now().toString(36)}`,
+    id: newId("rx"),
     patientId: appt.patientId,
     patientName: appt.patientName,
     doctorId: appt.doctorId,

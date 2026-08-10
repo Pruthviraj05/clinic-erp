@@ -2,15 +2,18 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE, DEMO_ROLE_COOKIE, signSessionToken } from "@/lib/session";
+import { SESSION_COOKIE, DEMO_ROLE_COOKIE, signSessionToken, isDemoLoginEnabled } from "@/lib/session";
 import { ROLE_HOME, type Role } from "@/lib/rbac";
 
 /**
- * Hidden dev fallback (see /dev-login, unlinked from the real login page):
- * selecting a role sets the demo cookie and opens that role's home. Does not
- * touch the real `users` collection — for quickly checking any screen.
+ * Dev fallback (see /dev-login): selecting a role sets the demo cookie and
+ * opens that role's home. Guarded server-side as well as at the page — a
+ * server action is a public endpoint, so hiding the UI is not enough.
  */
 export async function signInAs(role: Role) {
+  if (!isDemoLoginEnabled()) {
+    return { ok: false, message: "Demo sign-in is disabled." };
+  }
   const store = await cookies();
   store.set(DEMO_ROLE_COOKIE, role, {
     httpOnly: true,

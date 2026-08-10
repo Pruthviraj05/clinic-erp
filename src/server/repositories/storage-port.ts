@@ -39,12 +39,43 @@ import type { PrescriptionTemplate } from "@/server/demo/settings-store";
  * docs/05-roadmap.md for the reasoning and what's deferred.
  */
 
+/**
+ * A MongoDB-style query document, e.g. `{ patientId: "pat_1" }` or
+ * `{ scheduledStart: { $gte: iso } }`. Kept deliberately loose: the demo
+ * adapter interprets a useful subset in memory, MongoDB gets it verbatim.
+ */
+export type Query = Record<string, unknown>;
+
+export interface FindOptions {
+  /** e.g. `{ createdAt: -1 }` */
+  sort?: Record<string, 1 | -1>;
+  limit?: number;
+  skip?: number;
+  /** Field names to omit from the result — use for large blob fields. */
+  omit?: string[];
+}
+
 export interface EntityStore<T extends { id: string }> {
+  /**
+   * Fetches the WHOLE collection and filters in memory.
+   *
+   * Only safe for genuinely bounded collections (branches, doctors, masters,
+   * medicines). For anything that grows per patient/visit/day use `find`,
+   * which pushes the query down to the database and can use an index.
+   */
   list(filter?: (row: T) => boolean): Promise<T[]>;
+  /** Indexed query — the scalable path. Prefer this over `list`. */
+  find(query?: Query, options?: FindOptions): Promise<T[]>;
+  /** Counts matching rows without transferring them. */
+  count(query?: Query): Promise<number>;
   get(id: string): Promise<T | null>;
   insert(row: T): Promise<T>;
+  /** Inserts many rows in one round-trip. */
+  insertMany(rows: T[]): Promise<number>;
   /** Shallow-merges `patch`; returns the updated row or null if not found. */
   update(id: string, patch: Partial<T>): Promise<T | null>;
+  /** Applies the same patch to every matching row in one round-trip. */
+  updateMany(query: Query, patch: Partial<T>): Promise<number>;
   /** Hard-removes the row. Prefer `update({ isActive: false })` for aggregates. */
   remove(id: string): Promise<boolean>;
 }
@@ -53,6 +84,14 @@ export interface EntityStore<T extends { id: string }> {
 export interface SingletonStore<T> {
   get(): Promise<T>;
   set(value: T): Promise<T>;
+}
+
+/** An atomic, monotonic counter — used for invoice numbers, MRNs, tokens. */
+export interface CounterStore {
+  /** Atomically increments `key` and returns the new value. */
+  next(key: string): Promise<number>;
+  /** Raises `key` to at least `value` (used to seed from existing data). */
+  ensureAtLeast(key: string, value: number): Promise<void>;
 }
 
 export interface StoragePort {
@@ -78,4 +117,6 @@ export interface StoragePort {
   masters: Record<string, EntityStore<MasterRow>>;
   /** The one clinic-wide prescription header/footer/QR/vitals template. */
   settings: SingletonStore<PrescriptionTemplate>;
+  /** Atomic sequences (invoice numbers, MRNs) — never derive these from a count. */
+  counters: CounterStore;
 }

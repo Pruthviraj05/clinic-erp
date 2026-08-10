@@ -4,6 +4,7 @@
  * Same principle: shapes mirror the Prisma models.
  */
 import { daysFromNow, doctors } from "./data";
+import { newId } from "@/lib/ids";
 
 // ---------------------------------------------------------------------------
 // Medical records (EMR document uploads) — sample records for the 3 sample
@@ -167,7 +168,6 @@ export interface AuditRow {
   at: string;
 }
 
-let auditSeq = 100;
 
 /**
  * Append a real audit entry. Every mutating server action calls this so the
@@ -182,7 +182,7 @@ export async function logAudit(entry: {
 }): Promise<void> {
   const { db } = await import("@/server/repositories");
   await db.auditLog.insert({
-    id: `au_${auditSeq++}`,
+    id: newId("au"),
     ...entry,
     at: new Date().toISOString(),
   });

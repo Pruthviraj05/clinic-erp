@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { newId } from "@/lib/ids";
 import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
 import { logAudit } from "@/server/demo/extra";
@@ -51,7 +52,7 @@ export async function createPatientAction(
     return Number.isFinite(n) && n > max ? n : max;
   }, 100233) + 1;
   const patient: Patient = {
-    id: `pat_${Date.now()}`,
+    id: newId("pat"),
     mrn: `MRN-${nextSeq}`,
     firstName: input.firstName,
     lastName: input.lastName ?? null,
@@ -79,7 +80,7 @@ export async function createPatientAction(
     if (!emailTaken) {
       portalPassword = randomTempPassword();
       await db.users.insert({
-        id: `usr_${Date.now().toString(36)}`,
+        id: newId("usr"),
         fullName: patient.fullName,
         email: patient.email,
         role: "PATIENT",

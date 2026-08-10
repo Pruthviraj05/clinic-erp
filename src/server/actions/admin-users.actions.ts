@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { newId } from "@/lib/ids";
 import { z } from "zod";
 import { authorize } from "@/lib/guard";
 import { hashPassword } from "@/server/demo/users-store";
@@ -38,16 +39,17 @@ export async function createAdminAction(
   }
   const input = parsed.data;
 
-  const accounts = await db.users.list();
+  // Emails are stored lower-cased so the indexed login lookup matches.
   const normalized = input.email.trim().toLowerCase();
-  if (accounts.some((u) => u.email.toLowerCase() === normalized)) {
+  const existing = await db.users.find({ email: normalized }, { limit: 1 });
+  if (existing.length) {
     return { ok: false, message: "An account with that email already exists.", fieldErrors: { email: ["Already in use"] } };
   }
 
   const created: UserAccount = {
-    id: `usr_${Date.now().toString(36)}`,
+    id: newId("usr"),
     fullName: input.fullName,
-    email: input.email,
+    email: normalized,
     role: "ADMIN",
     passwordHash: hashPassword(input.password),
     isActive: true,

@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
-import { isVisibleTo } from "@/lib/notifications";
 import type { ActionResult } from "./appointment.actions";
 
 const NOTIFICATION_ROUTES = [
@@ -32,10 +31,16 @@ export async function markAllNotificationsReadAction(): Promise<ActionResult<{ c
   const authz = await authorize("notifications", "view");
   if (!authz.ok) return authz;
   const { user } = authz.session;
-  const unread = await db.notifications.list((n) => !n.read && isVisibleTo(n, user.linkId));
-  for (const n of unread) {
-    await db.notifications.update(n.id, { read: true });
-  }
+  // Two bulk writes rather than one round-trip per row: 500 unread used to
+  // mean 500 sequential updates.
+  const broadcast = await db.notifications.updateMany(
+    { read: false, recipientId: null },
+    { read: true },
+  );
+  const mine = user.linkId
+    ? await db.notifications.updateMany({ read: false, recipientId: user.linkId }, { read: true })
+    : 0;
+  const unread = { length: broadcast + mine };
   revalidateNotificationRoutes();
   return {
     ok: true,

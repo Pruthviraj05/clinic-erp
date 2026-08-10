@@ -1,24 +1,26 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { newId } from "@/lib/ids";
 import { z } from "zod";
 import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
 import { logAudit } from "@/server/demo/extra";
+import { PHARMACY_GST_RATE, round2 } from "@/lib/billing-rates";
 import type { Invoice, InvoiceItem } from "@/types/domain";
 import type { ActionResult } from "./appointment.actions";
 
-/** GST applied to dispensed medicines (standard pharma slab). */
-const PHARMACY_GST_RATE = 0.12;
 
-/** Round to 2 decimals — money never leaves an action unrounded. */
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
+/**
+ * Invoice numbers come from an atomic counter, never from a row count.
+ *
+ * Counting was both O(collection) and racy: two receptionists billing at the
+ * same moment both read the same count and minted the SAME invoice number,
+ * and deleting an invoice made the next number reuse an existing one.
+ */
 async function nextInvoiceNumber(): Promise<string> {
-  const count = (await db.invoices.list()).length;
-  return `INV-2026-${String(230 + count + 1).padStart(6, "0")}`;
+  const seq = await db.counters.next("invoice");
+  return `INV-2026-${String(230 + seq).padStart(6, "0")}`;
 }
 
 function revalidateBilling(id?: string) {
@@ -101,7 +103,7 @@ export async function createPharmacyBillAction(
     const med = medicineCache.get(medicineId)!;
     const balanceAfter = med.stockQty - totalQty;
     if (balanceAfter < 0) {
-      for (const [id, qty] of deducted) {
+      for (const [id] of deducted) {
         const m = medicineCache.get(id)!;
         await db.medicines.update(id, { stockQty: m.stockQty });
       }
@@ -113,7 +115,7 @@ export async function createPharmacyBillAction(
       updatedAt: new Date().toISOString(),
     });
     await db.stockMovements.insert({
-      id: `mv_${Date.now().toString(36)}_${medicineId}`,
+      id: newId("mv"),
       medicineId,
       medicineName: med.name,
       type: "SALE",
@@ -128,7 +130,7 @@ export async function createPharmacyBillAction(
 
   const now = new Date().toISOString();
   const invoice: Invoice = {
-    id: `inv_${Date.now()}`,
+    id: newId("inv"),
     number,
     branchId: payload.branchId,
     patientId: patient.id,
@@ -199,7 +201,7 @@ export async function createConsultationInvoiceAction(
 
   const number = await nextInvoiceNumber();
   const invoice: Invoice = {
-    id: `inv_${Date.now()}`,
+    id: newId("inv"),
     number,
     branchId: branch.id,
     patientId: patient.id,

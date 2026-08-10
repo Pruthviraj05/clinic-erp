@@ -1,4 +1,5 @@
 import { db } from "@/server/repositories";
+import { newId } from "@/lib/ids";
 import type { PrescriptionMedicine } from "@/types/domain";
 
 /**
@@ -19,7 +20,6 @@ export interface RxTemplate {
   followUpDays: number | null;
 }
 
-let templateSeq = 100;
 
 /** Rheumatology-focused quick-start templates — see docs/05-roadmap.md for sourcing notes. */
 export const SEED_RX_TEMPLATES: RxTemplate[] = [
@@ -110,6 +110,6 @@ export async function getRxTemplatesFor(doctorId: string): Promise<RxTemplate[]>
 }
 
 export async function addRxTemplate(input: Omit<RxTemplate, "id">): Promise<RxTemplate> {
-  const tpl: RxTemplate = { id: `tpl_${templateSeq++}`, ...input };
+  const tpl: RxTemplate = { id: newId("tpl"), ...input };
   return db.rxTemplates.insert(tpl);
 }

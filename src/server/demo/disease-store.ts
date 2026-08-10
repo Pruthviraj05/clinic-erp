@@ -1,4 +1,5 @@
 import { db } from "@/server/repositories";
+import { newId } from "@/lib/ids";
 
 /**
  * Disease-wise patient groups. Doctors organise their patients into named
@@ -13,7 +14,6 @@ export interface DiseaseGroup {
   createdAt: string;
 }
 
-let seq = 100;
 
 export async function groupsForDoctor(doctorId: string): Promise<DiseaseGroup[]> {
   return db.diseaseGroups.list((g) => g.doctorId === doctorId);
@@ -21,7 +21,7 @@ export async function groupsForDoctor(doctorId: string): Promise<DiseaseGroup[]>
 
 export async function createGroup(doctorId: string, name: string): Promise<DiseaseGroup> {
   const group: DiseaseGroup = {
-    id: `dg_${seq++}`,
+    id: newId("dg"),
     doctorId,
     name,
     patientIds: [],

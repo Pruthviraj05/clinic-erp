@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { newId } from "@/lib/ids";
 import { z } from "zod";
 import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
@@ -45,7 +46,7 @@ export async function createMedicalRecordAction(
   const patient = await db.patients.get(input.patientId);
   if (!patient) return { ok: false, message: "Patient not found." };
 
-  const id = `rec_${Date.now().toString(36)}`;
+  const id = newId("rec");
   const record: MedicalRecordItem = {
     id,
     patientId: patient.id,

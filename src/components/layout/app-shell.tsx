@@ -2,7 +2,6 @@ import { cookies } from "next/headers";
 import { AppShellClient } from "./app-shell-client";
 import type { SessionUser } from "@/lib/session";
 import { db } from "@/server/repositories";
-import { isVisibleTo } from "@/lib/notifications";
 
 /**
  * Authenticated application shell (server). Resolves per-user context and the
@@ -18,7 +17,15 @@ export async function AppShell({
   const branchName = user.branchId
     ? (await db.branches.get(user.branchId))?.name
     : undefined;
-  const unread = (await db.notifications.list((n) => !n.read && isVisibleTo(n, user.linkId))).length;
+  // Counted, not fetched: this runs on EVERY authenticated page render, so
+  // pulling the whole notifications collection here slowed the entire app.
+  const [broadcastUnread, ownUnread] = await Promise.all([
+    db.notifications.count({ read: false, recipientId: null }),
+    user.linkId
+      ? db.notifications.count({ read: false, recipientId: user.linkId })
+      : Promise.resolve(0),
+  ]);
+  const unread = broadcastUnread + ownUnread;
 
   const store = await cookies();
   const initialCollapsed = store.get("cc_sidebar")?.value === "1";

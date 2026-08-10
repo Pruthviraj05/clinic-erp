@@ -31,7 +31,14 @@ import type { DiseaseGroup } from "@/server/demo/disease-store";
 import type { RxDesign } from "@/server/demo/rx-design-store";
 import type { UserAccount } from "@/server/demo/users-store";
 import type { AuditRow } from "@/server/demo/extra";
-import type { EntityStore, SingletonStore, StoragePort } from "./storage-port";
+import type {
+  CounterStore,
+  EntityStore,
+  FindOptions,
+  Query,
+  SingletonStore,
+  StoragePort,
+} from "./storage-port";
 import type { StockMovementItem } from "@/types/domain";
 
 /**
@@ -40,10 +47,94 @@ import type { StockMovementItem } from "@/types/domain";
  * for the life of the dev process — intentional for demo mode.
  */
 
+/**
+ * Interprets the subset of MongoDB query syntax this app actually uses, so
+ * the demo adapter behaves like the real one. Supports equality plus
+ * `$ne / $gte / $gt / $lte / $lt / $in / $regex`, and a top-level `$or`.
+ */
+function matchesQuery<T>(row: T, query: Query): boolean {
+  for (const [key, condition] of Object.entries(query)) {
+    if (key === "$or") {
+      const branches = condition as Query[];
+      if (!branches.some((b) => matchesQuery(row, b))) return false;
+      continue;
+    }
+    const value = (row as Record<string, unknown>)[key];
+    if (condition !== null && typeof condition === "object" && !Array.isArray(condition)) {
+      const ops = condition as Record<string, unknown>;
+      for (const [op, operand] of Object.entries(ops)) {
+        switch (op) {
+          case "$ne": if (value === operand) return false; break;
+          case "$gte": if (!(value !== undefined && (value as never) >= (operand as never))) return false; break;
+          case "$gt": if (!(value !== undefined && (value as never) > (operand as never))) return false; break;
+          case "$lte": if (!(value !== undefined && (value as never) <= (operand as never))) return false; break;
+          case "$lt": if (!(value !== undefined && (value as never) < (operand as never))) return false; break;
+          case "$in": if (!(operand as unknown[]).includes(value)) return false; break;
+          case "$regex": {
+            const re = operand instanceof RegExp ? operand : new RegExp(String(operand), "i");
+            if (typeof value !== "string" || !re.test(value)) return false;
+            break;
+          }
+          default: return false;
+        }
+      }
+      continue;
+    }
+    // MongoDB treats `{ field: null }` as "null OR missing" — match that, so
+    // queries behave identically against either adapter.
+    if (condition === null) {
+      if (value !== null && value !== undefined) return false;
+      continue;
+    }
+    if (value !== condition) return false;
+  }
+  return true;
+}
+
+function applyOptions<T>(rows: T[], options: FindOptions): T[] {
+  let out = rows;
+  if (options.sort) {
+    const entries = Object.entries(options.sort);
+    out = [...out].sort((a, b) => {
+      for (const [field, dir] of entries) {
+        const av = (a as Record<string, unknown>)[field];
+        const bv = (b as Record<string, unknown>)[field];
+        if (av === bv) continue;
+        const cmp = (av as never) > (bv as never) ? 1 : -1;
+        return dir === 1 ? cmp : -cmp;
+      }
+      return 0;
+    });
+  }
+  if (options.skip) out = out.slice(options.skip);
+  if (options.limit !== undefined) out = out.slice(0, options.limit);
+  return out;
+}
+
 function arrayStore<T extends { id: string }>(rows: T[]): EntityStore<T> {
   return {
     async list(filter) {
       return filter ? rows.filter(filter) : rows.slice();
+    },
+    async find(query = {}, options = {}) {
+      return applyOptions(rows.filter((r) => matchesQuery(r, query)), options);
+    },
+    async count(query = {}) {
+      return rows.filter((r) => matchesQuery(r, query)).length;
+    },
+    async insertMany(newRows) {
+      rows.push(...newRows);
+      return newRows.length;
+    },
+    async updateMany(query, patch) {
+      let n = 0;
+      for (const row of rows) {
+        if (matchesQuery(row, query)) {
+          Object.assign(row, patch);
+          n += 1;
+        }
+      }
+      return n;
     },
     async get(id) {
       return rows.find((r) => r.id === id) ?? null;
@@ -145,6 +236,18 @@ const settingsStore: SingletonStore<typeof prescriptionTemplate> = {
   },
 };
 
+const counterValues = new Map<string, number>();
+const counterStore: CounterStore = {
+  async next(key) {
+    const value = (counterValues.get(key) ?? 0) + 1;
+    counterValues.set(key, value);
+    return value;
+  },
+  async ensureAtLeast(key, value) {
+    if ((counterValues.get(key) ?? 0) < value) counterValues.set(key, value);
+  },
+};
+
 export const demoAdapter: StoragePort = {
   patients: arrayStore(patients),
   appointments: arrayStore(appointments),
@@ -165,4 +268,5 @@ export const demoAdapter: StoragePort = {
   diseaseGroups: arrayStore(diseaseGroupsRows),
   masters,
   settings: settingsStore,
+  counters: counterStore,
 };

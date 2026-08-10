@@ -15,6 +15,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { createPharmacyBillAction } from "@/server/actions/billing.actions";
+import { PHARMACY_GST_RATE } from "@/lib/billing-rates";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -66,11 +67,20 @@ export function PharmacyBillDialog({
   const [pending, startTransition] = useTransition();
 
   const byId = useMemo(() => Object.fromEntries(medicines.map((m) => [m.id, m])), [medicines]);
-  const total = lines.reduce((s, l) => s + (byId[l.medicineId]?.price ?? 0) * l.quantity, 0);
+  const subtotal = lines.reduce((s, l) => s + (byId[l.medicineId]?.price ?? 0) * l.quantity, 0);
+  const taxAmount = Math.round(subtotal * PHARMACY_GST_RATE * 100) / 100;
+  const total = Math.round((subtotal + taxAmount) * 100) / 100;
 
-  function reset() {
-    setPatientId(initialPatientId ?? "");
-    setLines(initialLines && initialLines.length ? initialLines : [{ medicineId: "", quantity: 1 }]);
+  /**
+   * `afterBill` clears rather than restoring the prescription prefill: after a
+   * bill is generated, reopening the dialog must NOT come back preloaded with
+   * the medicines just dispensed, or one more click double-deducts stock and
+   * double-charges the patient.
+   */
+  function reset(afterBill = false) {
+    setPatientId(afterBill ? "" : initialPatientId ?? "");
+    const restore = afterBill ? undefined : initialLines;
+    setLines(restore && restore.length ? restore : [{ medicineId: "", quantity: 1 }]);
   }
 
   useEffect(() => {
@@ -91,13 +101,13 @@ export function PharmacyBillDialog({
       if (res.ok) {
         toast.success(res.message);
         setOpen(false);
-        reset();
+        reset(true); // dispensed — do not restore the prefill
       } else toast.error(res.message ?? "Could not generate bill");
     });
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(false); }}>
       <DialogTrigger className={buttonVariants()}>
         <Pill className="size-4" /> New pharmacy bill
       </DialogTrigger>
@@ -173,9 +183,21 @@ export function PharmacyBillDialog({
             </Button>
           </div>
 
-          <div className="flex items-center justify-between border-t pt-3">
-            <span className="text-sm text-muted-foreground">Total</span>
-            <span className="text-lg font-semibold">{formatCurrency(total)}</span>
+          {/* Must mirror the server's arithmetic exactly — the counter reads
+              this number out loud and collects it. */}
+          <div className="space-y-1 border-t pt-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Subtotal</span>
+              <span>{formatCurrency(subtotal)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">GST ({Math.round(PHARMACY_GST_RATE * 100)}%)</span>
+              <span>{formatCurrency(taxAmount)}</span>
+            </div>
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-sm font-medium">Total payable</span>
+              <span className="text-lg font-semibold">{formatCurrency(total)}</span>
+            </div>
           </div>
         </div>
 

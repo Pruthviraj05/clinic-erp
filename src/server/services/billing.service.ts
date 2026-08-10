@@ -1,18 +1,25 @@
 import "server-only";
 import { db } from "@/server/repositories";
+import type { Query } from "@/server/repositories/storage-port";
 import type { Invoice } from "@/types/domain";
 import type { SessionUser } from "@/lib/session";
 
-function branchScope(user: SessionUser): string | undefined {
-  return user.role === "RECEPTIONIST" ? user.branchId : undefined;
-}
-
+/** Fail-closed, same reasoning as prescriptions: no link → no rows. */
 export async function listInvoices(user: SessionUser, patientId?: string): Promise<Invoice[]> {
-  const branchId = branchScope(user);
-  let rows = await db.invoices.list();
-  if (branchId) rows = rows.filter((i) => i.branchId === branchId);
-  if (patientId) rows = rows.filter((i) => i.patientId === patientId);
-  return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const query: Query = {};
+
+  if (user.role === "RECEPTIONIST" && user.branchId) query.branchId = user.branchId;
+  if (user.role === "PATIENT") {
+    if (!user.linkId) return [];
+    query.patientId = user.linkId;
+  }
+
+  if (patientId) {
+    if (query.patientId && query.patientId !== patientId) return [];
+    query.patientId = patientId;
+  }
+
+  return db.invoices.find(query, { sort: { createdAt: -1 } });
 }
 
 /** Scoped single-invoice read: receptionists see their branch, patients only their own. */

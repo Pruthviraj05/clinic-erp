@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { newId } from "@/lib/ids";
 import { z } from "zod";
 import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
@@ -47,7 +48,7 @@ export async function createConsentAction(
   const [patient, doctor] = await Promise.all([db.patients.get(input.patientId), db.doctors.get(input.doctorId)]);
   if (!patient || !doctor) return { ok: false, message: "Invalid patient or doctor." };
 
-  const id = `cf_${Date.now().toString(36)}`;
+  const id = newId("cf");
   const form: ConsentFormItem = {
     id,
     patientId: patient.id,

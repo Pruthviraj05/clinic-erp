@@ -21,7 +21,22 @@ export default async function PortalDashboardPage() {
     db.prescriptions.list(),
     db.invoices.list(),
   ]);
-  const patient = allPatients.find((p) => p.id === user.linkId)!;
+  // The linked patient record can genuinely be gone (an admin may delete it),
+  // so this must degrade rather than throw and 500 the whole portal.
+  const patient = allPatients.find((p) => p.id === user.linkId);
+  if (!patient) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Welcome" description="Your patient record is not linked yet." />
+        <SectionCard title="Account not linked">
+          <p className="text-sm text-muted-foreground">
+            We could not find your patient record. Please contact the clinic front desk so they can link
+            your account — your appointments and prescriptions will appear here once that is done.
+          </p>
+        </SectionCard>
+      </div>
+    );
+  }
   const myAppts = allAppointments
     .filter((a) => a.patientId === user.linkId && new Date(a.scheduledStart) > new Date())
     .sort((a, b) => a.scheduledStart.localeCompare(b.scheduledStart));

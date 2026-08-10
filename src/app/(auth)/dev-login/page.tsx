@@ -1,17 +1,20 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
 import { getSession } from "@/lib/session";
 import { ROLE_HOME } from "@/lib/rbac";
+import { isDemoLoginEnabled } from "@/lib/session";
 import { RolePicker } from "@/features/auth/role-picker";
 
 export const metadata: Metadata = { title: "Dev sign-in" };
 
 /**
- * Hidden dev-only fallback: role-switcher demo login, reachable regardless of
- * NEXT_PUBLIC_AUTH_MODE. Not linked from the UI — for internal testing only.
+ * Dev-only role-switcher. This grants a full session with NO password, so it
+ * must never exist once real credentials are in use — `isDemoLoginEnabled()`
+ * is the single gate, shared with `getSession()` and `signInAs()`.
  */
 export default async function DevLoginPage() {
+  if (!isDemoLoginEnabled()) notFound();
   const session = await getSession();
   if (session) redirect(ROLE_HOME[session.user.role]);
 

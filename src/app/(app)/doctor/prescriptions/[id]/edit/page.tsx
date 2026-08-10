@@ -21,7 +21,9 @@ export default async function EditPrescriptionPage({ params }: { params: Promise
   const { user } = await requirePermission("prescriptions", "edit");
   const { id } = await params;
 
-  const rx = await getPrescription(id);
+  // Scoped read — the save action checks ownership too, but the form must not
+  // prefill another doctor's consultation in the first place.
+  const rx = await getPrescription(id, user);
   if (!rx) notFound();
   const patient = await db.patients.get(rx.patientId);
   if (!patient) notFound();

@@ -11,9 +11,10 @@ import { generateQrDataUrl } from "@/lib/qr";
 export const metadata: Metadata = { title: "Prescription" };
 
 export default async function DoctorPrescriptionDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireRole("DOCTOR");
+  const { user } = await requireRole("DOCTOR");
   const { id } = await params;
-  const rx = await getPrescription(id);
+  // Scoped read: a doctor may only open their own prescriptions.
+  const rx = await getPrescription(id, user);
   if (!rx) notFound();
   const { clinic, doctorMeta, patient, design } = await clinicInfoFor(rx);
   const qrDataUrl = await generateQrDataUrl(`https://clinicore.app/verify/rx/${rx.id}`);

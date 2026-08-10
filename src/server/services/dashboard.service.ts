@@ -126,13 +126,18 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
   for (const a of todayAppts) statusMap.set(a.status, (statusMap.get(a.status) ?? 0) + 1);
   const statusBreakdown: TrendPoint[] = Array.from(statusMap.entries()).map(([label, value]) => ({ label, value }));
 
-  const activities: ActivityItem[] = allAuditLog.slice(0, 6).map((row) => ({
-    id: row.id,
-    actor: row.actor,
-    action: humanizeEnum(row.action).toLowerCase(),
-    target: row.summary,
-    at: row.at,
-  }));
+  // Most recent six. `slice(0, 6)` on an append-ordered log returned the six
+  // OLDEST rows, so the panel froze after the first six events ever recorded.
+  const activities: ActivityItem[] = [...allAuditLog]
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, 6)
+    .map((row) => ({
+      id: row.id,
+      actor: row.actor,
+      action: humanizeEnum(row.action).toLowerCase(),
+      target: row.summary,
+      at: row.at,
+    }));
 
   return {
     metrics,
