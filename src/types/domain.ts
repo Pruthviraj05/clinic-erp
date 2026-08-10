@@ -205,6 +205,10 @@ export interface NotificationItem {
   status: string;
   createdAt: string;
   read: boolean;
+  /** Targets one user (their SessionUser.linkId). Absent = broadcast to everyone. */
+  recipientId?: string;
+  /** Where clicking the notification should navigate, if anywhere. */
+  actionUrl?: string;
 }
 
 export interface ActivityItem {

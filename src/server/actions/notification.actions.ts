@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
+import { isVisibleTo } from "@/lib/notifications";
 import type { ActionResult } from "./appointment.actions";
 
 const NOTIFICATION_ROUTES = [
@@ -26,11 +27,12 @@ export async function markNotificationReadAction(id: string): Promise<ActionResu
   return { ok: true, message: "Marked as read." };
 }
 
-/** Mark every notification as read. */
+/** Mark every notification visible to the current user as read. */
 export async function markAllNotificationsReadAction(): Promise<ActionResult<{ count: number }>> {
   const authz = await authorize("notifications", "view");
   if (!authz.ok) return authz;
-  const unread = await db.notifications.list((n) => !n.read);
+  const { user } = authz.session;
+  const unread = await db.notifications.list((n) => !n.read && isVisibleTo(n, user.linkId));
   for (const n of unread) {
     await db.notifications.update(n.id, { read: true });
   }

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { IndianRupee, Receipt, AlertCircle, CheckCircle2 } from "lucide-react";
 import { requireRole } from "@/lib/guard";
 import { getBillingSummary, listInvoices } from "@/server/services/billing.service";
+import { getPrescription } from "@/server/services/prescriptions.service";
+import { matchPrescribedMedicines } from "@/lib/medicine-match";
 import { db } from "@/server/repositories";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
@@ -12,16 +14,34 @@ import { formatCurrency } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Billing" };
 
-export default async function ReceptionBillingPage() {
+export default async function ReceptionBillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ patientId?: string; prescriptionId?: string }>;
+}) {
   const { user } = await requireRole("RECEPTIONIST");
-  const [invoices, summary, branches, doctors, medicines, patients] = await Promise.all([
+  const { patientId: prefillPatientId, prescriptionId } = await searchParams;
+  const [invoices, summary, branches, doctors, medicines, patients, prescription] = await Promise.all([
     listInvoices(user),
     getBillingSummary(user),
     db.branches.list(),
     db.doctors.list(),
     db.medicines.list(),
     db.patients.list(),
+    prescriptionId ? getPrescription(prescriptionId) : Promise.resolve(null),
   ]);
+
+  const activeMedicines = medicines.filter((m) => m.isActive);
+  let initialLines: { medicineId: string; quantity: number }[] | undefined;
+  let unmatchedNames: string[] | undefined;
+  if (prescription && prescription.patientId === prefillPatientId) {
+    const { lines, unmatched } = matchPrescribedMedicines(
+      prescription.medicines.map((m) => m.name),
+      activeMedicines,
+    );
+    initialLines = lines.length ? lines : undefined;
+    unmatchedNames = unmatched.length ? unmatched : undefined;
+  }
 
   return (
     <div className="space-y-6">
@@ -38,8 +58,12 @@ export default async function ReceptionBillingPage() {
             />
             <PharmacyBillDialog
               branchId={user.branchId ?? "br_ravet"}
-              medicines={medicines.filter((m) => m.isActive).map((m) => ({ id: m.id, name: m.name, stock: m.stockQty, unit: m.unit, price: m.sellPrice }))}
+              medicines={activeMedicines.map((m) => ({ id: m.id, name: m.name, stock: m.stockQty, unit: m.unit, price: m.sellPrice }))}
               patients={patients.filter((p) => p.isActive).map((p) => ({ id: p.id, label: p.fullName, sublabel: p.mrn }))}
+              initialPatientId={prefillPatientId}
+              initialLines={initialLines}
+              unmatchedNames={unmatchedNames}
+              autoOpen={Boolean(prefillPatientId && prescriptionId)}
             />
           </div>
         }

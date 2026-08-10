@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import { requireRole } from "@/lib/guard";
 import { db } from "@/server/repositories";
+import { visibleNotifications } from "@/lib/notifications";
 import { PageHeader } from "@/components/shared/page-header";
 import { NotificationsView } from "@/features/notifications/notifications-view";
 
 export const metadata: Metadata = { title: "Notifications" };
 
 export default async function PortalNotificationsPage() {
-  await requireRole("PATIENT");
+  const { user } = await requireRole("PATIENT");
   // Patient-facing reminders only.
-  const notifications = await db.notifications.list();
+  const notifications = visibleNotifications(await db.notifications.list(), user.linkId);
   const items = notifications.filter((n) =>
     ["APPOINTMENT_REMINDER", "FOLLOWUP_REMINDER", "PAYMENT_CONFIRMATION", "PRESCRIPTION_SHARED"].includes(n.type),
   );

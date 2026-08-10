@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/server/repositories";
 import { humanizeEnum } from "@/lib/format";
+import { visibleNotifications } from "@/lib/notifications";
 import type { SessionUser } from "@/lib/session";
 import type { Appointment, ActivityItem, DashboardMetrics, NotificationItem, Prescription, TrendPoint } from "@/types/domain";
 
@@ -140,7 +141,7 @@ export async function getDashboardData(user: SessionUser): Promise<DashboardData
       .filter((a) => new Date(a.scheduledStart) > now)
       .sort((a, b) => a.scheduledStart.localeCompare(b.scheduledStart))
       .slice(0, 6),
-    notifications: allNotifications.slice(0, 6),
+    notifications: visibleNotifications(allNotifications, user.linkId).slice(0, 6),
     activities,
     revenueTrend,
     appointmentTrend,

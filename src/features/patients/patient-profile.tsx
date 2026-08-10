@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   CalendarDays,
   FileText,
@@ -11,12 +12,15 @@ import {
   Droplet,
   AlertTriangle,
   Activity,
+  Pill,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { SectionCard } from "@/components/shared/section-card";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { formatAge, formatCurrency, formatDate, formatDateTime, humanizeEnum, initials } from "@/lib/format";
 import { AddMedicalRecordDialog } from "@/features/records/medical-record-dialog";
 import type { PatientBundle } from "@/server/services/patients.service";
@@ -74,11 +78,14 @@ export function PatientProfile({
   bundle,
   qrDataUrl,
   canAddRecord = false,
+  canBill = false,
 }: {
   bundle: PatientBundle;
   qrDataUrl?: string;
   /** Doctor/staff viewing this profile may add a medical record for this patient. */
   canAddRecord?: boolean;
+  /** Reception viewing this profile may generate a pharmacy bill prefilled from a prescription. */
+  canBill?: boolean;
 }) {
   const { patient, appointments, prescriptions, invoices, records } = bundle;
   const timeline = buildTimeline(bundle);
@@ -207,6 +214,14 @@ export function PatientProfile({
                         </span>
                       ))}
                     </div>
+                    {canBill && p.medicines.length > 0 && (
+                      <Link
+                        href={`/reception/billing?patientId=${patient.id}&prescriptionId=${p.id}`}
+                        className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-2.5")}
+                      >
+                        <Pill className="size-3.5" /> Generate pharmacy bill
+                      </Link>
+                    )}
                   </div>
                 ))}
               </div>

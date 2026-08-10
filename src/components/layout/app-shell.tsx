@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import { AppShellClient } from "./app-shell-client";
 import type { SessionUser } from "@/lib/session";
-import { branches, notifications } from "@/server/demo/data";
+import { db } from "@/server/repositories";
+import { isVisibleTo } from "@/lib/notifications";
 
 /**
  * Authenticated application shell (server). Resolves per-user context and the
@@ -15,9 +16,9 @@ export async function AppShell({
   children: React.ReactNode;
 }) {
   const branchName = user.branchId
-    ? branches.find((b) => b.id === user.branchId)?.name
+    ? (await db.branches.get(user.branchId))?.name
     : undefined;
-  const unread = notifications.filter((n) => !n.read).length;
+  const unread = (await db.notifications.list((n) => !n.read && isVisibleTo(n, user.linkId))).length;
 
   const store = await cookies();
   const initialCollapsed = store.get("cc_sidebar")?.value === "1";

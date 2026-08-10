@@ -161,6 +161,37 @@ describe("createPrescriptionAction", () => {
     expect((await db.prescriptions.list()).length).toBe(countBefore + 1);
     expect((await db.appointments.get(apptFixture.id))!.status).toBe("COMPLETED");
     expect(res.data?.patientName).toBe(apptFixture.patientName);
+
+    // Front desk is told a pharmacy bill is due, deep-linked to a prefilled bill.
+    const note = (await db.notifications.list((n) => n.id === `ntf_rx_${res.data!.id}`))[0];
+    expect(note).toBeDefined();
+    expect(note.type).toBe("PHARMACY_BILL_PENDING");
+    expect(note.read).toBe(false);
+    expect(note.actionUrl).toBe(
+      `/reception/billing?patientId=${apptFixture.patientId}&prescriptionId=${res.data!.id}`,
+    );
+    // Broadcast (no recipientId) so whoever is on the desk sees it.
+    expect(note.recipientId).toBeUndefined();
+  });
+
+  it("does not raise a billing notification when nothing was prescribed", async () => {
+    const appt = await db.appointments.insert({
+      ...apptFixture,
+      id: "apt_test_nomeds",
+      status: "CONFIRMED",
+    });
+    const res = await createPrescriptionAction({
+      appointmentId: appt.id,
+      complaints: ["Review only"],
+      diagnoses: ["Rheumatoid Arthritis"],
+      medicines: [],
+      investigations: [],
+      advice: [],
+      followUpDate: null,
+    });
+    expect(res.ok).toBe(true);
+    const note = (await db.notifications.list((n) => n.id === `ntf_rx_${res.data!.id}`))[0];
+    expect(note).toBeUndefined();
   });
 
   it("rejects an unknown appointment", async () => {

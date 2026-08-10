@@ -13,6 +13,7 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
 const { createConsentAction, updateConsentAction, signConsentAction } = await import("./consent.actions");
 const { db } = await import("@/server/repositories");
+const { isVisibleTo } = await import("@/lib/notifications");
 
 function fd(values: Record<string, string>): FormData {
   const form = new FormData();
@@ -91,6 +92,32 @@ describe("reception consent workflow", () => {
     const res = await createConsentAction(null, fd({ patientId: "", doctorId: "", title: "x", body: "short" }));
     expect(res.ok).toBe(false);
     expect(res.fieldErrors).toBeDefined();
+  });
+
+  it("notifies only the assigned doctor when reception creates a form", async () => {
+    const res = await createConsentAction(
+      null,
+      fd({
+        patientId: otherPatient.id,
+        doctorId: otherDoctor.id,
+        title: "Consent for Joint Aspiration",
+        body: "I consent to the joint aspiration procedure advised by my physician.",
+      }),
+    );
+    expect(res.ok).toBe(true);
+
+    const notes = await db.notifications.list((n) => n.type === "CONSENT_ASSIGNED");
+    const mine = notes.find((n) => n.id === `ntf_consent_${res.data!.id}`)!;
+    expect(mine).toBeDefined();
+    expect(mine.recipientId).toBe(otherDoctor.id);
+    expect(mine.read).toBe(false);
+    expect(mine.actionUrl).toBe("/doctor/consent");
+    expect(mine.body).toContain(otherPatient.fullName);
+
+    // Targeted: visible to the assigned doctor, hidden from everyone else.
+    expect(isVisibleTo(mine, otherDoctor.id)).toBe(true);
+    expect(isVisibleTo(mine, "doc_bhosikar")).toBe(false);
+    expect(isVisibleTo(mine, "pat_demo")).toBe(false);
   });
 
   it("lets the assigned doctor edit an unsigned form", async () => {

@@ -13,6 +13,8 @@ function revalidateConsent() {
   revalidatePath("/admin/consent");
   revalidatePath("/reception/consent");
   revalidatePath("/doctor/consent");
+  revalidatePath("/doctor/notifications");
+  revalidatePath("/doctor");
 }
 
 const consentFormSchema = z.object({
@@ -60,6 +62,19 @@ export async function createConsentAction(
     updatedAt: new Date().toISOString(),
   };
   await db.consentForms.insert(form);
+
+  await db.notifications.insert({
+    id: `ntf_consent_${id}`,
+    type: "CONSENT_ASSIGNED",
+    channel: "IN_APP",
+    title: "New consent form assigned",
+    body: `${user.fullName} assigned you a consent form for ${patient.fullName}: “${input.title}”.`,
+    status: "SENT",
+    createdAt: new Date().toISOString(),
+    read: false,
+    recipientId: doctor.id,
+    actionUrl: "/doctor/consent",
+  });
 
   await logAudit({
     actor: user.fullName,

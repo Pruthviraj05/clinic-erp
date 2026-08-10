@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { Bell, Check, MessageSquare, Mail, Smartphone, Monitor, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -41,7 +42,13 @@ function List({
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <p className="text-sm font-medium">{n.title}</p>
+                {n.actionUrl ? (
+                  <Link href={n.actionUrl} className="text-sm font-medium hover:underline">
+                    {n.title}
+                  </Link>
+                ) : (
+                  <p className="text-sm font-medium">{n.title}</p>
+                )}
                 {!n.read && <span className="size-2 rounded-full bg-primary" />}
               </div>
               <p className="text-sm text-muted-foreground">{n.body}</p>

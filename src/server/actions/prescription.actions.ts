@@ -95,6 +95,22 @@ export async function createPrescriptionAction(
   await db.appointments.update(appt.id, { status: "COMPLETED" });
   await db.patients.update(appt.patientId, { lastVisitAt: now });
 
+  // Tell the front desk a pharmacy bill is due, deep-linking to a bill
+  // prefilled with the prescribed medicines.
+  if (input.medicines.length > 0) {
+    await db.notifications.insert({
+      id: `ntf_rx_${rx.id}`,
+      type: "PHARMACY_BILL_PENDING",
+      channel: "IN_APP",
+      title: "Prescription ready to bill",
+      body: `${user.fullName} prescribed ${input.medicines.length} medicine(s) for ${appt.patientName}. Generate the pharmacy bill.`,
+      status: "SENT",
+      createdAt: now,
+      read: false,
+      actionUrl: `/reception/billing?patientId=${appt.patientId}&prescriptionId=${rx.id}`,
+    });
+  }
+
   await logAudit({
     actor: user.fullName,
     role: user.role,
@@ -108,6 +124,8 @@ export async function createPrescriptionAction(
   revalidatePath("/doctor/consult");
   revalidatePath("/admin/prescriptions");
   revalidatePath("/portal/prescriptions");
+  revalidatePath("/reception/notifications");
+  revalidatePath("/reception");
   return { ok: true, message: `Prescription saved for ${appt.patientName}.`, data: rx };
 }
 

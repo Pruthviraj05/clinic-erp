@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { Pill, Plus, Trash2, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { Pill, Plus, Trash2, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -43,23 +43,39 @@ export function PharmacyBillDialog({
   medicines,
   patients,
   branchId,
+  initialPatientId,
+  initialLines,
+  unmatchedNames,
+  autoOpen = false,
 }: {
   medicines: MedOption[];
   patients: PatientOption[];
   branchId: string;
+  /** Prefill from a just-issued prescription — reception still reviews/edits before generating. */
+  initialPatientId?: string;
+  initialLines?: Line[];
+  /** Prescribed medicine names that had no catalog match — shown as a heads-up. */
+  unmatchedNames?: string[];
+  autoOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  const [patientId, setPatientId] = useState("");
-  const [lines, setLines] = useState<Line[]>([{ medicineId: "", quantity: 1 }]);
+  const [open, setOpen] = useState(autoOpen);
+  const [patientId, setPatientId] = useState(initialPatientId ?? "");
+  const [lines, setLines] = useState<Line[]>(
+    initialLines && initialLines.length ? initialLines : [{ medicineId: "", quantity: 1 }],
+  );
   const [pending, startTransition] = useTransition();
 
   const byId = useMemo(() => Object.fromEntries(medicines.map((m) => [m.id, m])), [medicines]);
   const total = lines.reduce((s, l) => s + (byId[l.medicineId]?.price ?? 0) * l.quantity, 0);
 
   function reset() {
-    setPatientId("");
-    setLines([{ medicineId: "", quantity: 1 }]);
+    setPatientId(initialPatientId ?? "");
+    setLines(initialLines && initialLines.length ? initialLines : [{ medicineId: "", quantity: 1 }]);
   }
+
+  useEffect(() => {
+    if (autoOpen) setOpen(true);
+  }, [autoOpen]);
 
   function submit() {
     const items = lines.filter((l) => l.medicineId && l.quantity > 0);
@@ -92,6 +108,14 @@ export function PharmacyBillDialog({
         </DialogHeader>
 
         <div className="grid gap-4">
+          {unmatchedNames && unmatchedNames.length > 0 && (
+            <div className="flex items-start gap-2 rounded-lg border border-[var(--warning)]/40 bg-[var(--warning)]/10 p-2.5 text-xs text-[var(--warning)]">
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+              <span>
+                No catalog match for: {unmatchedNames.join(", ")}. Add them manually below with the right price.
+              </span>
+            </div>
+          )}
           <div className="grid gap-2">
             <Label>Patient</Label>
             <select value={patientId} onChange={(e) => setPatientId(e.target.value)} className={fieldClass}>
