@@ -165,6 +165,13 @@ export interface Invoice {
   createdAt: string;
 }
 
+/**
+ * Schedule classification under the Drugs and Cosmetics Rules. H and H1 may
+ * only be dispensed against a prescription; H1 additionally requires a
+ * separate register recording the prescriber and patient.
+ */
+export type MedicineSchedule = "OTC" | "H" | "H1" | "X";
+
 export interface Medicine {
   id: string;
   name: string;
@@ -173,12 +180,55 @@ export interface Medicine {
   brand: string | null;
   unit: string;
   reorderLevel: number;
+  /**
+   * Total across all batches. Kept as a maintained aggregate so list screens
+   * and low-stock checks stay a single read — `medicineBatches` is the
+   * authoritative detail, and every stock movement updates both together.
+   */
   stockQty: number;
   sellPrice: number;
+  /** Earliest expiry among batches still holding stock. Derived, not entered. */
   nearestExpiry: string | null;
   isActive: boolean;
   updatedBy?: string | null;
   updatedAt?: string | null;
+  /** Printed maximum retail price — the ceiling we may legally charge. */
+  mrp?: number | null;
+  /** Latest purchase price (PTR), for margin reporting. */
+  costPrice?: number | null;
+  /** Per-item GST slab. Pharma spans 5/12/18%, so a flat rate mis-bills. */
+  gstRate?: number;
+  hsnCode?: string | null;
+  /** Physical shelf/rack, so staff can actually find the box. */
+  rackLocation?: string | null;
+  schedule?: MedicineSchedule;
+}
+
+/**
+ * A single received lot of a medicine.
+ *
+ * Stock has to be tracked per batch, not as one number: a recall targets a
+ * batch, expiry is a property of a batch, and cost varies between purchases.
+ * Dispensing draws from the batch expiring soonest (FEFO).
+ */
+export interface MedicineBatch {
+  id: string;
+  medicineId: string;
+  medicineName: string;
+  batchNo: string;
+  /** ISO date; null when the supplier bill did not state one. */
+  expiry: string | null;
+  /** Units remaining in this lot. */
+  quantity: number;
+  /** Units originally received, so consumption is visible. */
+  receivedQty: number;
+  /** Price to retailer — what we paid per unit. */
+  costPrice: number;
+  mrp: number;
+  supplierName?: string | null;
+  purchaseBillNo?: string | null;
+  receivedAt: string;
+  receivedBy: string;
 }
 
 export type StockMovementType = "IN" | "OUT" | "ADJUST" | "SALE";
@@ -196,6 +246,10 @@ export interface StockMovementItem {
   at: string;
   /** Supplier bill/invoice photo for a stock-in, as a base64 data URL. */
   billPhotoDataUrl?: string;
+  /** The lot this movement touched — a recall needs to trace dispensing. */
+  batchId?: string;
+  batchNo?: string;
+  expiry?: string | null;
 }
 
 export interface NotificationItem {

@@ -34,7 +34,10 @@ Project Settings → Environment Variables, then redeploy:
 `NEXT_PUBLIC_AUTH_MODE=credentials` also switches off the dev login (see 1.4) —
 do not skip it.
 
-### 1.3 Run the two setup scripts once Atlas is reachable **[YOU]**
+### 1.3 Run the setup scripts once Atlas is reachable **[YOU]**
+
+Indexes first — without them every lookup, including login, scans the whole
+collection. All three are safe to re-run.
 
 ```bash
 node --env-file=.env.local scripts/ensure-indexes.mjs
@@ -44,8 +47,14 @@ node --env-file=.env.local scripts/ensure-indexes.mjs
 node --env-file=.env.local scripts/seed-mongodb.mjs
 ```
 
-Indexes first. Without them every lookup — including login — scans the whole
-collection. Both scripts are safe to re-run.
+```bash
+node --env-file=.env.local scripts/backfill-batches.mjs
+```
+
+The third one only matters if you already have live stock in MongoDB. Stock is
+now held per batch, so any medicine carrying a quantity but no batch rows
+cannot be dispensed until it has one — the backfill creates an "OPENING" lot
+for each. It prints what it did and skips anything already batched.
 
 ### 1.4 Change the admin password at first login **[YOU]**
 Ships as `admin@gmail.com` / `Test@12345`. The app now **forces** this — the
@@ -180,6 +189,44 @@ Recorded so you know what changed.
   authenticated caller could POST an arbitrary multi-megabyte blob.
 - **A patient could create a consent form naming another patient**; now blocked.
 - **Notification read-state accepted any ID from any user**; now ownership-checked.
+
+## 4c. Inventory rebuilt around batches
+
+Modelled on how eVitalRx (and any real pharmacy system) handles stock.
+
+**Stock is now held per batch, not as one number.** Each lot carries its own
+batch number, expiry, purchase price and MRP. This is what makes the rest
+possible — expiry belongs to a lot, a recall targets a lot, and cost varies
+between purchases.
+
+- **Dispensing is FEFO** (first-expiry-first-out): the lot closest to expiry
+  goes out first, which is what minimises write-offs. The pharmacy bill shows
+  which batch will be dispensed, so the person at the counter can check it
+  against the box they are taking off the shelf.
+- **Receive stock** screen replaces the old "+50 units" adjustment: medicine,
+  batch, expiry, quantity, free scheme units, purchase price, MRP, supplier and
+  bill number, with an optional photo of the bill. It shows the resulting
+  margin live and warns if you would be selling at a loss. Free units correctly
+  lower the effective per-unit cost rather than being ignored.
+- **Batches tab** — every lot, nearest expiry first, with quantity remaining
+  against quantity received, cost, MRP, supplier and bill.
+- **Expiry tab** — everything expiring within 90 days, colour-coded by
+  urgency. This is the window in which distributors still accept returns.
+- **Stock movements now record the lot**, so a recall can be traced to the
+  patients who received that batch.
+- **Stock value is now real** — valued at actual purchase cost, with retail
+  value and margin alongside. Previously there was no cost price at all, so
+  the clinic had no visibility of profit.
+- **GST is per medicine.** It was hardcoded at 12% for everything; pharma spans
+  5/12/18%, so the old flat rate both mis-billed patients and under-reported
+  tax. Supplements are now correctly at 5%.
+- Medicines also gained **rack location** (so staff can find the box),
+  **schedule H/H1/X** (prescription-only classification under the Drugs and
+  Cosmetics Rules) and **HSN code** for GST filing.
+
+Not copied from eVitalRx, deliberately: distributor ledgers, purchase orders,
+gate passes and e-invoicing are wholesale-pharmacy concerns and would be
+clutter in a single-doctor clinic.
 
 ## 5. Performance and scale
 

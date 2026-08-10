@@ -17,6 +17,7 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
 const { createPharmacyBillAction } = await import("./billing.actions");
 const { db } = await import("@/server/repositories");
+const { receiveStock } = await import("@/server/demo/batch-store");
 
 const patient: Patient = {
   id: "pat_bill_test",
@@ -55,9 +56,24 @@ function med(id: string, stockQty: number, sellPrice = 10): Medicine {
 
 beforeAll(async () => {
   await db.patients.insert(patient);
-  await db.medicines.insert(med("med_bill_a", 100, 20));
-  await db.medicines.insert(med("med_bill_b", 3, 50));
-  await db.medicines.insert(med("med_bill_c", 10, 15));
+  // Stock lives in batches now, so it has to be RECEIVED — inserting a
+  // medicine with a bare stockQty leaves nothing for FEFO to draw from.
+  for (const [id, qty, price] of [
+    ["med_bill_a", 100, 20],
+    ["med_bill_b", 3, 50],
+    ["med_bill_c", 10, 15],
+  ] as const) {
+    await db.medicines.insert(med(id, 0, price));
+    await receiveStock({
+      medicineId: id,
+      quantity: qty,
+      batchNo: `B-${id}`,
+      expiry: new Date(Date.now() + 200 * 86_400_000).toISOString(),
+      costPrice: price * 0.7,
+      mrp: price * 1.2,
+      by: "Seed",
+    });
+  }
 });
 
 describe("createPharmacyBillAction", () => {

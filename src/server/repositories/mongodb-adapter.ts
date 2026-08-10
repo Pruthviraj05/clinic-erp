@@ -232,6 +232,7 @@ export const mongodbAdapter: StoragePort = {
   receptionists: mongoStore("receptionists"),
   medicalRecords: mongoStore("medical_records"),
   medicines: mongoStore("medicines"),
+  medicineBatches: mongoStore("medicine_batches"),
   stockMovements: mongoStore("stock_movements"),
   notifications: mongoStore("notifications"),
   consentForms: mongoStore("consent_forms"),

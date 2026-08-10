@@ -373,31 +373,34 @@ async function main() {
   // stock. Two items sit at/below reorder level (med_15, med_19) so the
   // low-stock alert demos, and med_10 expires inside 30 days so the
   // "Expiring ≤30 days" card is non-zero. Mirrors demo/data.ts.
+  // `gstRate` is a decimal fraction (0.12 = 12%). HSN 3004 is the heading for
+  // formulated medicaments, so it is the same for every row here.
   // Tuple: [id, name, generic, category, unit, reorderLevel, sellPrice,
-  //         stockQty, expiryInDays | null]
+  //         stockQty, expiryInDays | null, mrp, costPrice, gstRate,
+  //         rackLocation, schedule]
   // -------------------------------------------------------------------
   const medicines = [
-    ["med_1", "Etoricoxib 90mg", "Etoricoxib", "NSAID", "Tablet", 20, 12, 140, 210],
-    ["med_2", "Diclofenac 50mg", "Diclofenac Sodium", "NSAID", "Tablet", 20, 4, 160, 300],
-    ["med_3", "Aceclofenac 100mg + Paracetamol 325mg", "Aceclofenac + Paracetamol", "NSAID", "Tablet", 20, 8, 120, 240],
-    ["med_4", "Methotrexate 7.5mg", "Methotrexate", "DMARD", "Tablet", 10, 15, 60, 180],
-    ["med_5", "Sulfasalazine 500mg", "Sulfasalazine", "DMARD", "Tablet", 10, 9, 55, null],
-    ["med_6", "Hydroxychloroquine 200mg", "Hydroxychloroquine Sulfate", "DMARD", "Tablet", 10, 11, 48, 330],
-    ["med_7", "Leflunomide 20mg", "Leflunomide", "DMARD", "Tablet", 10, 22, 40, 270],
-    ["med_8", "Prednisolone 5mg", "Prednisolone", "Steroid", "Tablet", 15, 3, 90, 150],
-    ["med_9", "Febuxostat 40mg", "Febuxostat", "Gout Management", "Tablet", 15, 14, 100, 360],
-    ["med_10", "Colchicine 0.5mg", "Colchicine", "Gout Management", "Tablet", 15, 6, 75, 21],
-    ["med_11", "Allopurinol 100mg", "Allopurinol", "Gout Management", "Tablet", 15, 5, 80, 420],
-    ["med_12", "Calcium 500mg + Vitamin D3 250IU", "Calcium Carbonate + Cholecalciferol", "Bone Health", "Tablet", 25, 7, 180, 300],
-    ["med_13", "Vitamin D3 60000IU", "Cholecalciferol", "Bone Health", "Sachet", 20, 30, 90, 240],
-    ["med_14", "Alendronate 70mg", "Alendronate Sodium", "Bone Health", "Tablet", 10, 45, 45, 380],
-    ["med_15", "Thiocolchicoside 4mg", "Thiocolchicoside", "Muscle Relaxant", "Tablet", 20, 10, 12, 190],
-    ["med_16", "Chlorzoxazone 250mg + Paracetamol 500mg", "Chlorzoxazone + Paracetamol", "Muscle Relaxant", "Tablet", 20, 6, 130, null],
-    ["med_17", "Pantoprazole 40mg", "Pantoprazole", "PPI", "Tablet", 25, 5, 200, 310],
-    ["med_18", "Folic Acid 5mg", "Folic Acid", "Supplement", "Tablet", 20, 2, 150, 350],
-    ["med_19", "Etanercept 25mg Injection", "Etanercept", "Biologic (DMARD)", "Injection", 5, 3200, 2, 120],
-    ["med_20", "Tramadol 37.5mg + Paracetamol 325mg", "Tramadol + Paracetamol", "Analgesic", "Tablet", 20, 9, 110, 220],
-  ].map(([id, name, genericName, category, unit, reorderLevel, sellPrice, stockQty, expiryInDays]) => ({
+    ["med_1", "Etoricoxib 90mg", "Etoricoxib", "NSAID", "Tablet", 20, 12, 140, 210, 14, 8.5, 0.12, "A-1", "OTC"],
+    ["med_2", "Diclofenac 50mg", "Diclofenac Sodium", "NSAID", "Tablet", 20, 4, 160, 300, 4.8, 2.8, 0.12, "A-1", "OTC"],
+    ["med_3", "Aceclofenac 100mg + Paracetamol 325mg", "Aceclofenac + Paracetamol", "NSAID", "Tablet", 20, 8, 120, 240, 9.5, 5.6, 0.12, "A-2", "OTC"],
+    ["med_4", "Methotrexate 7.5mg", "Methotrexate", "DMARD", "Tablet", 10, 15, 60, 180, 18, 10.5, 0.12, "B-1", "H"],
+    ["med_5", "Sulfasalazine 500mg", "Sulfasalazine", "DMARD", "Tablet", 10, 9, 55, null, 10.5, 6.3, 0.12, "B-1", "H"],
+    ["med_6", "Hydroxychloroquine 200mg", "Hydroxychloroquine Sulfate", "DMARD", "Tablet", 10, 11, 48, 330, 13, 7.7, 0.12, "B-2", "H"],
+    ["med_7", "Leflunomide 20mg", "Leflunomide", "DMARD", "Tablet", 10, 22, 40, 270, 26, 15.4, 0.12, "B-2", "H"],
+    ["med_8", "Prednisolone 5mg", "Prednisolone", "Steroid", "Tablet", 15, 3, 90, 150, 3.6, 2.1, 0.12, "B-3", "H"],
+    ["med_9", "Febuxostat 40mg", "Febuxostat", "Gout Management", "Tablet", 15, 14, 100, 360, 16.5, 9.8, 0.12, "C-1", "H"],
+    ["med_10", "Colchicine 0.5mg", "Colchicine", "Gout Management", "Tablet", 15, 6, 75, 21, 7.2, 4.2, 0.12, "C-1", "H"],
+    ["med_11", "Allopurinol 100mg", "Allopurinol", "Gout Management", "Tablet", 15, 5, 80, 420, 6, 3.5, 0.12, "C-2", "H"],
+    ["med_12", "Calcium 500mg + Vitamin D3 250IU", "Calcium Carbonate + Cholecalciferol", "Bone Health", "Tablet", 25, 7, 180, 300, 8.4, 4.9, 0.05, "D-1", "OTC"],
+    ["med_13", "Vitamin D3 60000IU", "Cholecalciferol", "Bone Health", "Sachet", 20, 30, 90, 240, 35, 21, 0.05, "D-1", "OTC"],
+    ["med_14", "Alendronate 70mg", "Alendronate Sodium", "Bone Health", "Tablet", 10, 45, 45, 380, 54, 31.5, 0.12, "D-2", "H"],
+    ["med_15", "Thiocolchicoside 4mg", "Thiocolchicoside", "Muscle Relaxant", "Tablet", 20, 10, 12, 190, 12, 7, 0.12, "E-1", "H"],
+    ["med_16", "Chlorzoxazone 250mg + Paracetamol 500mg", "Chlorzoxazone + Paracetamol", "Muscle Relaxant", "Tablet", 20, 6, 130, null, 7.2, 4.2, 0.12, "E-1", "OTC"],
+    ["med_17", "Pantoprazole 40mg", "Pantoprazole", "PPI", "Tablet", 25, 5, 200, 310, 6, 3.5, 0.12, "E-2", "OTC"],
+    ["med_18", "Folic Acid 5mg", "Folic Acid", "Supplement", "Tablet", 20, 2, 150, 350, 2.4, 1.4, 0.05, "D-3", "OTC"],
+    ["med_19", "Etanercept 25mg Injection", "Etanercept", "Biologic (DMARD)", "Injection", 5, 3200, 2, 120, 3600, 2800, 0.12, "COLD-1", "H"],
+    ["med_20", "Tramadol 37.5mg + Paracetamol 325mg", "Tramadol + Paracetamol", "Analgesic", "Tablet", 20, 9, 110, 220, 10.8, 6.3, 0.12, "C-3", "H"],
+  ].map(([id, name, genericName, category, unit, reorderLevel, sellPrice, stockQty, expiryInDays, mrp, costPrice, gstRate, rackLocation, schedule]) => ({
     id,
     name,
     genericName,
@@ -409,9 +412,73 @@ async function main() {
     sellPrice,
     nearestExpiry: expiryInDays === null ? null : daysFromNow(expiryInDays),
     isActive: true,
+    mrp,
+    costPrice,
+    gstRate,
+    hsnCode: "3004",
+    rackLocation,
+    schedule,
   }));
   await upsertMany(db.collection("medicines"), medicines);
   console.log(`Seeded: medicines (${medicines.length} items, sample opening stock)`);
+
+  // -------------------------------------------------------------------
+  // Medicine batches — the lot-level detail behind the opening stock.
+  // Per medicine the lot quantities sum to that medicine's `stockQty`, and
+  // the earliest expiry among lots still holding stock equals its
+  // `nearestExpiry`, so Stock / Batches / Expiry all reconcile. Four
+  // medicines (med_2, med_8, med_10, med_12) carry two lots so FEFO
+  // ordering is visible. Mirrors demo-adapter.ts exactly.
+  // Tuple: [id, medicineId, medicineName, batchNo, expiryInDays | null,
+  //         quantity, receivedQty, costPrice, mrp, supplier, billNo,
+  //         receivedDays, receivedHour, receivedMinute, receivedBy]
+  // -------------------------------------------------------------------
+  const SUP_SAHYADRI = "Sahyadri Pharma Distributors";
+  const SUP_DECCAN = "Deccan Medico Agencies";
+  const SUP_NIRMAL = "Nirmal Healthcare Supplies";
+
+  const medicineBatches = [
+    ["bat_seed_1", "med_1", "Etoricoxib 90mg", "ETX2431", 210, 140, 150, 8.5, 14, SUP_SAHYADRI, "SPD-4471", -30, 10, 15, "Priya Kale"],
+    ["bat_seed_2", "med_2", "Diclofenac 50mg", "DCF8802", 300, 60, 60, 2.9, 4.8, SUP_SAHYADRI, "SPD-4471", -30, 10, 20, "Priya Kale"],
+    ["bat_seed_3", "med_2", "Diclofenac 50mg", "DCF9147", 400, 100, 100, 2.75, 4.8, SUP_DECCAN, "DMA-1246", -12, 11, 30, "Priya Kale"],
+    ["bat_seed_4", "med_3", "Aceclofenac 100mg + Paracetamol 325mg", "ACP5510", 240, 120, 120, 5.6, 9.5, SUP_SAHYADRI, "SPD-4471", -30, 10, 20, "Priya Kale"],
+    ["bat_seed_5", "med_4", "Methotrexate 7.5mg", "MTX1209", 180, 60, 60, 10.5, 18, SUP_DECCAN, "DMA-1180", -30, 10, 25, "Priya Kale"],
+    ["bat_seed_6", "med_5", "Sulfasalazine 500mg", "SSZ3364", null, 55, 55, 6.3, 10.5, SUP_DECCAN, "DMA-1180", -30, 10, 25, "Priya Kale"],
+    ["bat_seed_7", "med_6", "Hydroxychloroquine 200mg", "HCQ7721", 330, 48, 48, 7.7, 13, SUP_DECCAN, "DMA-1180", -30, 10, 25, "Priya Kale"],
+    ["bat_seed_8", "med_7", "Leflunomide 20mg", "LEF4408", 270, 40, 40, 15.4, 26, SUP_DECCAN, "DMA-1180", -30, 10, 25, "Priya Kale"],
+    ["bat_seed_9", "med_8", "Prednisolone 5mg", "PRD2290", 150, 30, 50, 2.2, 3.6, SUP_SAHYADRI, "SPD-4471", -30, 10, 30, "Priya Kale"],
+    ["bat_seed_10", "med_8", "Prednisolone 5mg", "PRD3115", 290, 60, 60, 2.05, 3.6, SUP_NIRMAL, "NHS-0138", -9, 12, 15, "Priya Kale"],
+    ["bat_seed_11", "med_9", "Febuxostat 40mg", "FBX6603", 360, 100, 100, 9.8, 16.5, SUP_NIRMAL, "NHS-0092", -14, 11, 0, "Admin"],
+    ["bat_seed_12", "med_10", "Colchicine 0.5mg", "COL1874", 21, 15, 40, 4.3, 7.2, SUP_SAHYADRI, "SPD-4402", -60, 10, 45, "Priya Kale"],
+    ["bat_seed_13", "med_10", "Colchicine 0.5mg", "COL2318", 280, 60, 60, 4.1, 7.2, SUP_DECCAN, "DMA-1246", -12, 11, 30, "Priya Kale"],
+    ["bat_seed_14", "med_11", "Allopurinol 100mg", "ALP5029", 420, 80, 80, 3.5, 6, SUP_DECCAN, "DMA-1246", -12, 11, 30, "Priya Kale"],
+    ["bat_seed_15", "med_12", "Calcium 500mg + Vitamin D3 250IU", "CAD3390", 300, 80, 100, 5, 8.4, SUP_SAHYADRI, "SPD-4471", -30, 10, 35, "Priya Kale"],
+    ["bat_seed_16", "med_12", "Calcium 500mg + Vitamin D3 250IU", "CAD4102", 420, 100, 100, 4.85, 8.4, SUP_NIRMAL, "NHS-0138", -9, 12, 15, "Priya Kale"],
+    ["bat_seed_17", "med_13", "Vitamin D3 60000IU", "VTD7745", 240, 90, 90, 21, 35, SUP_SAHYADRI, "SPD-4471", -30, 10, 35, "Priya Kale"],
+    ["bat_seed_18", "med_14", "Alendronate 70mg", "ALN9931", 380, 45, 45, 31.5, 54, SUP_NIRMAL, "NHS-0092", -14, 11, 0, "Admin"],
+    ["bat_seed_19", "med_15", "Thiocolchicoside 4mg", "THC2207", 190, 12, 50, 7, 12, SUP_DECCAN, "DMA-1180", -30, 10, 25, "Priya Kale"],
+    ["bat_seed_20", "med_16", "Chlorzoxazone 250mg + Paracetamol 500mg", "CZP6614", null, 130, 130, 4.2, 7.2, SUP_DECCAN, "DMA-1180", -30, 10, 25, "Priya Kale"],
+    ["bat_seed_21", "med_17", "Pantoprazole 40mg", "PAN4478", 310, 200, 200, 3.5, 6, SUP_DECCAN, "DMA-1180", -30, 10, 25, "Priya Kale"],
+    ["bat_seed_22", "med_18", "Folic Acid 5mg", "FOL1156", 350, 150, 150, 1.4, 2.4, SUP_SAHYADRI, "SPD-4471", -30, 10, 35, "Priya Kale"],
+    ["bat_seed_23", "med_19", "Etanercept 25mg Injection", "ETN0071", 120, 2, 2, 2800, 3600, SUP_NIRMAL, "NHS-0092", -14, 11, 0, "Admin"],
+    ["bat_seed_24", "med_20", "Tramadol 37.5mg + Paracetamol 325mg", "TRP8823", 220, 110, 120, 6.3, 10.8, SUP_SAHYADRI, "SPD-4471", -30, 10, 35, "Priya Kale"],
+  ].map(([id, medicineId, medicineName, batchNo, expiryInDays, quantity, receivedQty, costPrice, mrp, supplierName, purchaseBillNo, receivedDays, receivedHour, receivedMinute, receivedBy]) => ({
+    id,
+    medicineId,
+    medicineName,
+    batchNo,
+    expiry: expiryInDays === null ? null : daysFromNow(expiryInDays),
+    quantity,
+    receivedQty,
+    costPrice,
+    mrp,
+    supplierName,
+    purchaseBillNo,
+    receivedAt: daysFromNow(receivedDays, receivedHour, receivedMinute),
+    receivedBy,
+  }));
+  await upsertMany(db.collection("medicine_batches"), medicineBatches);
+  console.log(`Seeded: medicine_batches (${medicineBatches.length} lots)`);
 
   // -------------------------------------------------------------------
   // Stock movements — sample ledger reconciling with the opening stock
@@ -428,6 +495,9 @@ async function main() {
       reason: "Opening stock — Sahyadri Pharma Distributors, invoice SPD-4471",
       by: "Priya Kale",
       at: daysFromNow(-30, 10, 15),
+      batchId: "bat_seed_1",
+      batchNo: "ETX2431",
+      expiry: daysFromNow(210),
     },
     {
       id: "stk_seed_2",
@@ -439,6 +509,9 @@ async function main() {
       reason: "Opening stock — Deccan Medico Agencies, invoice DMA-1180",
       by: "Priya Kale",
       at: daysFromNow(-30, 10, 25),
+      batchId: "bat_seed_21",
+      batchNo: "PAN4478",
+      expiry: daysFromNow(310),
     },
     {
       id: "stk_seed_3",
@@ -450,6 +523,9 @@ async function main() {
       reason: "Cold-chain receipt — Nirmal Healthcare Supplies, invoice NHS-0092",
       by: "Admin",
       at: daysFromNow(-14, 11, 0),
+      batchId: "bat_seed_23",
+      batchNo: "ETN0071",
+      expiry: daysFromNow(120),
     },
     {
       id: "stk_seed_4",
@@ -461,6 +537,9 @@ async function main() {
       reason: "Dispensed — Ramesh Kulkarni (MRN-100235)",
       by: "Priya Kale",
       at: daysFromNow(-10, 17, 5),
+      batchId: "bat_seed_1",
+      batchNo: "ETX2431",
+      expiry: daysFromNow(210),
     },
   ];
   await upsertMany(db.collection("stock_movements"), stockMovements);

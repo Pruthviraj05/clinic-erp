@@ -25,6 +25,31 @@ export const editMedicineSchema = z.object({
 });
 export type EditMedicineInput = z.infer<typeof editMedicineSchema>;
 
+/**
+ * Goods-received entry — one lot from a supplier bill.
+ *
+ * Batch number and expiry are required because they are what a recall and a
+ * shelf-life check work from; a receipt without them is not traceable.
+ */
+export const receiveStockSchema = z.object({
+  medicineId: z.string().min(1, "Pick a medicine"),
+  batchNo: z.string().trim().min(1, "Batch number is required").max(40),
+  expiry: z
+    .string()
+    .regex(/^\d{4}-\d{2}(-\d{2})?$/, "Use YYYY-MM or YYYY-MM-DD")
+    .optional()
+    .or(z.literal("")),
+  quantity: z.coerce.number().int().min(1, "Quantity must be at least 1").max(1000000),
+  /** Bonus units from a supplier scheme — received but not paid for. */
+  freeQuantity: z.coerce.number().int().min(0).max(100000).default(0),
+  costPrice: z.coerce.number().min(0, "Enter the purchase price").max(1000000),
+  mrp: z.coerce.number().min(0).max(1000000),
+  supplierName: z.string().trim().max(120).optional(),
+  purchaseBillNo: z.string().trim().max(60).optional(),
+  billPhotoDataUrl: uploadDataUrlSchema,
+});
+export type ReceiveStockInput = z.infer<typeof receiveStockSchema>;
+
 export const adjustStockSchema = z.object({
   medicineId: z.string().min(1),
   direction: z.enum(["IN", "OUT"]),

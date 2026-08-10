@@ -3,6 +3,7 @@ import { IndianRupee, Receipt, AlertCircle, CheckCircle2 } from "lucide-react";
 import { requireRole } from "@/lib/guard";
 import { getBillingSummary, listInvoices } from "@/server/services/billing.service";
 import { db } from "@/server/repositories";
+import { toMedicineOptions } from "@/lib/medicine-options";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
 import { InvoicesView } from "@/features/billing/invoices-view";
@@ -14,12 +15,13 @@ export const metadata: Metadata = { title: "Billing" };
 
 export default async function AdminBillingPage() {
   const { user } = await requireRole("ADMIN");
-  const [invoices, summary, branches, doctors, medicines, patients] = await Promise.all([
+  const [invoices, summary, branches, doctors, medicines, batches, patients] = await Promise.all([
     listInvoices(user),
     getBillingSummary(user),
     db.branches.list(),
     db.doctors.list(),
     db.medicines.list(),
+    db.medicineBatches.list(),
     db.patients.list(),
   ]);
 
@@ -38,7 +40,7 @@ export default async function AdminBillingPage() {
             />
             <PharmacyBillDialog
               branchId={user.branchId ?? "br_ravet"}
-              medicines={medicines.filter((m) => m.isActive).map((m) => ({ id: m.id, name: m.name, stock: m.stockQty, unit: m.unit, price: m.sellPrice }))}
+              medicines={toMedicineOptions(medicines.filter((m) => m.isActive), batches)}
               patients={patients.filter((p) => p.isActive).map((p) => ({ id: p.id, label: p.fullName, sublabel: p.mrn }))}
             />
           </div>

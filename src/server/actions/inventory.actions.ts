@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { newId } from "@/lib/ids";
 import { authorize } from "@/lib/guard";
 import { addMedicine, applyStockChange, lowStockItems, updateMedicine } from "@/server/demo/inventory-store";
+import { receiveStock } from "@/server/demo/batch-store";
 import { db } from "@/server/repositories";
 import { logAudit } from "@/server/demo/extra";
 import {
@@ -11,6 +12,7 @@ import {
   adjustStockSchema,
   editMedicineSchema,
   importStockSchema,
+  receiveStockSchema,
   type ImportStockInput,
 } from "@/features/inventory/schema";
 import type { ActionResult } from "./appointment.actions";
@@ -107,6 +109,74 @@ export async function updateMedicineAction(
   });
   revalidatePath("/admin/inventory");
   return { ok: true, message: `Updated ${med.name}.`, data: med };
+}
+
+/**
+ * Record a goods receipt against a supplier bill.
+ *
+ * This is the proper way stock enters: as a lot with a batch number, expiry
+ * and the price we actually paid. `adjustStockAction` remains for corrections
+ * (damage, counting errors), which are a different thing.
+ */
+export async function receiveStockAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const authz = await authorize("inventory", "create");
+  if (!authz.ok) return authz;
+  const { session } = authz;
+
+  const parsed = receiveStockSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    return { ok: false, message: "Please fix the highlighted fields.", fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+  const input = parsed.data;
+
+  // A bare YYYY-MM means "end of that month", which is how packs are printed.
+  const expiry = input.expiry ? endOfExpiryMonth(input.expiry) : null;
+  if (expiry && expiry < new Date().toISOString()) {
+    return { ok: false, message: "That batch has already expired.", fieldErrors: { expiry: ["Already expired"] } };
+  }
+
+  // Free scheme units are stock we hold and can dispense; they simply cost
+  // nothing, which is what pulls the effective per-unit cost down.
+  const totalUnits = input.quantity + input.freeQuantity;
+  const effectiveCost = totalUnits > 0 ? (input.costPrice * input.quantity) / totalUnits : input.costPrice;
+
+  const res = await receiveStock({
+    medicineId: input.medicineId,
+    quantity: totalUnits,
+    batchNo: input.batchNo,
+    expiry,
+    costPrice: Math.round(effectiveCost * 100) / 100,
+    mrp: input.mrp,
+    supplierName: input.supplierName,
+    purchaseBillNo: input.purchaseBillNo,
+    by: session.user.fullName,
+    billPhotoDataUrl: input.billPhotoDataUrl,
+  });
+  if (!res.ok) return { ok: false, message: res.message };
+
+  await logAudit({
+    actor: session.user.fullName,
+    role: session.user.role,
+    action: "CREATE",
+    entity: "MedicineBatch",
+    summary: `Received ${totalUnits} × ${res.batch?.medicineName} (batch ${input.batchNo}${input.purchaseBillNo ? `, bill ${input.purchaseBillNo}` : ""})`,
+  });
+
+  revalidatePath("/admin/inventory");
+  return {
+    ok: true,
+    message: `Received ${totalUnits} unit(s) into batch ${input.batchNo}${input.freeQuantity ? ` (incl. ${input.freeQuantity} free)` : ""}.`,
+  };
+}
+
+/** Packs print `MM/YYYY`; the medicine is usable to the last day of it. */
+function endOfExpiryMonth(value: string): string {
+  const [y, m, d] = value.split("-").map(Number);
+  if (d) return new Date(Date.UTC(y, m - 1, d, 23, 59, 59)).toISOString();
+  return new Date(Date.UTC(y, m, 0, 23, 59, 59)).toISOString();
 }
 
 export interface ImportStockSummary {

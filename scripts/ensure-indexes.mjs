@@ -79,6 +79,14 @@ const INDEXES = {
     [{ isActive: 1, stockQty: 1 }],
     [{ name: 1 }],
   ],
+  medicine_batches: [
+    [{ id: 1 }, { unique: true }],
+    // FEFO reads exactly this: live lots for one medicine, nearest expiry first.
+    [{ medicineId: 1, quantity: 1, expiry: 1 }],
+    // The expiry report scans across all medicines.
+    [{ expiry: 1, quantity: 1 }],
+    [{ batchNo: 1 }],
+  ],
   doctors: [[{ id: 1 }, { unique: true }]],
   branches: [[{ id: 1 }, { unique: true }]],
   receptionists: [[{ id: 1 }, { unique: true }]],

@@ -5,6 +5,7 @@ import { getBillingSummary, listInvoices } from "@/server/services/billing.servi
 import { getPrescription } from "@/server/services/prescriptions.service";
 import { matchPrescribedMedicines } from "@/lib/medicine-match";
 import { db } from "@/server/repositories";
+import { toMedicineOptions } from "@/lib/medicine-options";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
 import { InvoicesView } from "@/features/billing/invoices-view";
@@ -21,12 +22,13 @@ export default async function ReceptionBillingPage({
 }) {
   const { user } = await requireRole("RECEPTIONIST");
   const { patientId: prefillPatientId, prescriptionId } = await searchParams;
-  const [invoices, summary, branches, doctors, medicines, patients, prescription] = await Promise.all([
+  const [invoices, summary, branches, doctors, medicines, batches, patients, prescription] = await Promise.all([
     listInvoices(user),
     getBillingSummary(user),
     db.branches.list(),
     db.doctors.list(),
     db.medicines.list(),
+    db.medicineBatches.list(),
     db.patients.list(),
     prescriptionId ? getPrescription(prescriptionId) : Promise.resolve(null),
   ]);
@@ -58,7 +60,7 @@ export default async function ReceptionBillingPage({
             />
             <PharmacyBillDialog
               branchId={user.branchId ?? "br_ravet"}
-              medicines={activeMedicines.map((m) => ({ id: m.id, name: m.name, stock: m.stockQty, unit: m.unit, price: m.sellPrice }))}
+              medicines={toMedicineOptions(activeMedicines, batches)}
               patients={patients.filter((p) => p.isActive).map((p) => ({ id: p.id, label: p.fullName, sublabel: p.mrn }))}
               initialPatientId={prefillPatientId}
               initialLines={initialLines}

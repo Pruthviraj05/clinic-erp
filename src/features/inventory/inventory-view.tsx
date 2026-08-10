@@ -22,8 +22,9 @@ import { AddMedicineDialog } from "./add-medicine-dialog";
 import { AdjustStockDialog } from "./adjust-stock-dialog";
 import { EditMedicineDialog } from "./edit-medicine-dialog";
 import { ImportStockDialog } from "./import-stock-dialog";
+import { ReceiveStockDialog } from "./receive-stock-dialog";
 import { sendLowStockAlertAction, setMedicineActiveAction } from "@/server/actions/inventory.actions";
-import type { Medicine, StockMovementItem } from "@/types/domain";
+import type { Medicine, MedicineBatch, StockMovementItem } from "@/types/domain";
 
 function LowStockBanner({ items }: { items: Medicine[] }) {
   const [pending, startTransition] = useTransition();
@@ -116,19 +117,67 @@ function MedicineRowActions({
   );
 }
 
+/** Days until expiry — negative means already expired. */
+function daysUntil(iso: string | null): number | null {
+  if (!iso) return null;
+  return Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000);
+}
+
+function ExpiryBadge({ expiry }: { expiry: string | null }) {
+  const days = daysUntil(expiry);
+  if (days === null) return <span className="text-sm text-muted-foreground">—</span>;
+  const tone =
+    days < 0
+      ? "bg-destructive/10 text-destructive"
+      : days <= 30
+        ? "bg-[var(--warning)]/15 text-[var(--warning)]"
+        : days <= 90
+          ? "bg-[var(--info)]/12 text-[var(--info)]"
+          : "text-muted-foreground";
+  const label = days < 0 ? "Expired" : days <= 90 ? `${days}d left` : formatDate(expiry);
+  return (
+    <span className={cn("inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium", tone)}>
+      {label}
+    </span>
+  );
+}
+
 export function InventoryView({
   medicines,
   movements,
+  batches,
+  suppliers = [],
   canEdit = false,
   canDelete = false,
 }: {
   medicines: Medicine[];
   movements: StockMovementItem[];
+  batches: MedicineBatch[];
+  suppliers?: string[];
   canEdit?: boolean;
   canDelete?: boolean;
 }) {
   const [tab, setTab] = useState("stock");
   const lowStock = useMemo(() => medicines.filter((m) => m.stockQty <= m.reorderLevel), [medicines]);
+
+  /** Lots still holding stock, nearest expiry first — the FEFO pick order. */
+  const liveBatches = useMemo(
+    () =>
+      [...batches]
+        .filter((b) => b.quantity > 0)
+        .sort((a, b) => {
+          if (a.expiry === b.expiry) return a.receivedAt.localeCompare(b.receivedAt);
+          if (!a.expiry) return 1;
+          if (!b.expiry) return -1;
+          return a.expiry.localeCompare(b.expiry);
+        }),
+    [batches],
+  );
+
+  const attention = useMemo(
+    () => liveBatches.filter((b) => { const d = daysUntil(b.expiry); return d !== null && d <= 90; }),
+    [liveBatches],
+  );
 
   const stockColumns = useMemo<ColumnDef<Medicine>[]>(
     () => [
@@ -251,6 +300,64 @@ export function InventoryView({
     [],
   );
 
+  const batchColumns = useMemo<ColumnDef<MedicineBatch>[]>(
+    () => [
+      {
+        accessorKey: "medicineName",
+        header: "Medicine",
+        cell: ({ row }) => (
+          <div className="leading-tight">
+            <div className="font-medium">{row.original.medicineName}</div>
+            <div className="text-xs text-muted-foreground">Batch {row.original.batchNo}</div>
+          </div>
+        ),
+      },
+      {
+        accessorKey: "expiry",
+        header: "Expiry",
+        cell: ({ row }) => <ExpiryBadge expiry={row.original.expiry} />,
+      },
+      {
+        accessorKey: "quantity",
+        header: "In stock",
+        cell: ({ row }) => (
+          <span className="text-sm">
+            {row.original.quantity}
+            <span className="text-muted-foreground"> / {row.original.receivedQty}</span>
+          </span>
+        ),
+      },
+      {
+        accessorKey: "costPrice",
+        header: "Cost",
+        cell: ({ row }) => <span className="text-sm">{formatCurrency(row.original.costPrice)}</span>,
+      },
+      {
+        accessorKey: "mrp",
+        header: "MRP",
+        cell: ({ row }) => <span className="text-sm">{formatCurrency(row.original.mrp)}</span>,
+      },
+      {
+        id: "supplier",
+        header: "Supplier",
+        cell: ({ row }) => (
+          <div className="leading-tight">
+            <div className="text-sm">{row.original.supplierName ?? "—"}</div>
+            {row.original.purchaseBillNo && (
+              <div className="text-xs text-muted-foreground">{row.original.purchaseBillNo}</div>
+            )}
+          </div>
+        ),
+      },
+      {
+        accessorKey: "receivedAt",
+        header: "Received",
+        cell: ({ row }) => <span className="text-sm whitespace-nowrap">{formatDate(row.original.receivedAt)}</span>,
+      },
+    ],
+    [],
+  );
+
   return (
     <div className="space-y-4">
       <LowStockBanner items={lowStock} />
@@ -258,6 +365,8 @@ export function InventoryView({
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="stock">Stock ({medicines.length})</TabsTrigger>
+          <TabsTrigger value="batches">Batches ({liveBatches.length})</TabsTrigger>
+          <TabsTrigger value="expiry">Expiry ({attention.length})</TabsTrigger>
           <TabsTrigger value="movements">Movements ({movements.length})</TabsTrigger>
         </TabsList>
 
@@ -284,6 +393,7 @@ export function InventoryView({
             toolbar={
               canEdit ? (
                 <>
+                  <ReceiveStockDialog medicines={medicines} suppliers={suppliers} />
                   <ImportStockDialog medicines={medicines} />
                   <AddMedicineDialog />
                 </>
@@ -291,6 +401,53 @@ export function InventoryView({
                 <AddMedicineDialog />
               )
             }
+          />
+        </TabsContent>
+
+        <TabsContent value="batches" className="mt-4">
+          <DataTable
+            columns={batchColumns}
+            data={liveBatches}
+            searchPlaceholder="Search medicine, batch, supplier…"
+            pageSize={15}
+            emptyMessage="No stock received yet — use Receive stock to add a batch"
+            exportName="batches"
+            exportMapper={(b) => ({
+              Medicine: b.medicineName,
+              Batch: b.batchNo,
+              Expiry: formatDate(b.expiry),
+              InStock: b.quantity,
+              Received: b.receivedQty,
+              Cost: b.costPrice,
+              MRP: b.mrp,
+              Supplier: b.supplierName ?? "",
+              Bill: b.purchaseBillNo ?? "",
+              ReceivedOn: formatDate(b.receivedAt),
+            })}
+          />
+        </TabsContent>
+
+        <TabsContent value="expiry" className="mt-4 space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Batches expiring within 90 days, nearest first. Most distributors only accept returns
+            <span className="font-medium text-foreground"> before </span> expiry, so this is the window to act in.
+          </p>
+          <DataTable
+            columns={batchColumns}
+            data={attention}
+            searchPlaceholder="Search medicine, batch, supplier…"
+            pageSize={15}
+            emptyMessage="Nothing expiring in the next 90 days"
+            exportName="expiring-batches"
+            exportMapper={(b) => ({
+              Medicine: b.medicineName,
+              Batch: b.batchNo,
+              Expiry: formatDate(b.expiry),
+              DaysLeft: daysUntil(b.expiry) ?? "",
+              InStock: b.quantity,
+              ValueAtCost: b.quantity * b.costPrice,
+              Supplier: b.supplierName ?? "",
+            })}
           />
         </TabsContent>
 

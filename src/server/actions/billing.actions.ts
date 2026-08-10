@@ -7,6 +7,7 @@ import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
 import { logAudit } from "@/server/demo/extra";
 import { PHARMACY_GST_RATE, round2 } from "@/lib/billing-rates";
+import { commitDispense, planDispense, restoreDispense, type DispenseLine } from "@/server/demo/batch-store";
 import type { Invoice, InvoiceItem } from "@/types/domain";
 import type { ActionResult } from "./appointment.actions";
 
@@ -72,13 +73,22 @@ export async function createPharmacyBillAction(
     needed.set(it.medicineId, (needed.get(it.medicineId) ?? 0) + it.quantity);
   }
   const medicineCache = new Map<string, Awaited<ReturnType<typeof db.medicines.get>>>();
+  // Plan every withdrawal BEFORE writing anything: a bill that dispensed half
+  // its lines and then failed would leave stock and the ledger disagreeing.
+  const plans = new Map<string, DispenseLine[]>();
   for (const [medicineId, totalQty] of needed) {
     const med = await db.medicines.get(medicineId);
     medicineCache.set(medicineId, med);
     if (!med) return { ok: false, message: "Invalid medicine selected." };
-    if (med.stockQty < totalQty) {
-      return { ok: false, message: `Insufficient stock for ${med.name} (only ${med.stockQty} ${med.unit}, bill needs ${totalQty}).` };
+
+    const plan = await planDispense(medicineId, totalQty);
+    if (!plan.ok) {
+      return {
+        ok: false,
+        message: `Insufficient stock for ${med.name} (only ${plan.available} ${med.unit}, bill needs ${totalQty}).`,
+      };
     }
+    plans.set(medicineId, plan.lines);
   }
 
   const number = await nextInvoiceNumber();
@@ -92,40 +102,32 @@ export async function createPharmacyBillAction(
     };
   });
   const subtotal = round2(lineItems.reduce((s, i) => s + i.lineTotal, 0));
-  const taxAmount = round2(subtotal * PHARMACY_GST_RATE);
+  // GST is per item — pharma spans 5/12/18%, so a single flat rate mis-bills
+  // and under-reports tax. Falls back to the default slab when unset.
+  const taxAmount = round2(
+    items.reduce((sum, it) => {
+      const med = medicineCache.get(it.medicineId)!;
+      const rate = med.gstRate ?? PHARMACY_GST_RATE;
+      return sum + med.sellPrice * it.quantity * rate;
+    }, 0),
+  );
   const totalAmount = round2(subtotal + taxAmount);
 
-  // Deduct stock + log SALE movement per aggregated medicine. Deduction is
-  // checked; on an unexpected failure, previously deducted lines are restored
-  // so the bill is all-or-nothing.
-  const deducted: Array<[string, number]> = [];
-  for (const [medicineId, totalQty] of needed) {
-    const med = medicineCache.get(medicineId)!;
-    const balanceAfter = med.stockQty - totalQty;
-    if (balanceAfter < 0) {
-      for (const [id] of deducted) {
-        const m = medicineCache.get(id)!;
-        await db.medicines.update(id, { stockQty: m.stockQty });
-      }
-      return { ok: false, message: `Insufficient stock for ${med.name}.` };
+  // Commit the planned FEFO withdrawals. Each medicine's plan was validated
+  // above, so a failure here is unexpected — roll the earlier ones back so the
+  // bill stays all-or-nothing.
+  const committed: Array<[string, DispenseLine[]]> = [];
+  try {
+    for (const [medicineId, lines] of plans) {
+      const med = medicineCache.get(medicineId)!;
+      await commitDispense(medicineId, med.name, lines, `Dispensed — ${number}`, session.user.fullName);
+      committed.push([medicineId, lines]);
     }
-    await db.medicines.update(medicineId, {
-      stockQty: balanceAfter,
-      updatedBy: session.user.fullName,
-      updatedAt: new Date().toISOString(),
-    });
-    await db.stockMovements.insert({
-      id: newId("mv"),
-      medicineId,
-      medicineName: med.name,
-      type: "SALE",
-      quantity: -totalQty,
-      balanceAfter,
-      reason: `Dispensed — ${number}`,
-      by: session.user.fullName,
-      at: new Date().toISOString(),
-    });
-    deducted.push([medicineId, totalQty]);
+  } catch {
+    for (const [medicineId, lines] of committed) {
+      await restoreDispense(medicineId, lines, session.user.fullName);
+    }
+    return { ok: false, message: "Could not update stock — the bill was not created." };
   }
 
   const now = new Date().toISOString();

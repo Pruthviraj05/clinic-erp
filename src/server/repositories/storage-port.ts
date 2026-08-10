@@ -8,6 +8,7 @@ import type {
   Patient,
   Prescription,
   Receptionist,
+  MedicineBatch,
   StockMovementItem,
 } from "@/types/domain";
 import type {
@@ -104,6 +105,7 @@ export interface StoragePort {
   receptionists: EntityStore<Receptionist>;
   medicalRecords: EntityStore<MedicalRecordItem>;
   medicines: EntityStore<Medicine>;
+  medicineBatches: EntityStore<MedicineBatch>;
   stockMovements: EntityStore<StockMovementItem>;
   notifications: EntityStore<NotificationItem>;
   consentForms: EntityStore<ConsentFormItem>;

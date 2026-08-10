@@ -16,7 +16,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { createPharmacyBillAction } from "@/server/actions/billing.actions";
 import { PHARMACY_GST_RATE } from "@/lib/billing-rates";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export interface MedOption {
@@ -25,6 +25,10 @@ export interface MedOption {
   stock: number;
   unit: string;
   price: number;
+  /** The lot FEFO will draw from first — shown so it can be checked against the shelf. */
+  nextBatchNo?: string | null;
+  nextExpiry?: string | null;
+  gstRate?: number;
 }
 export interface PatientOption {
   id: string;
@@ -68,8 +72,29 @@ export function PharmacyBillDialog({
 
   const byId = useMemo(() => Object.fromEntries(medicines.map((m) => [m.id, m])), [medicines]);
   const subtotal = lines.reduce((s, l) => s + (byId[l.medicineId]?.price ?? 0) * l.quantity, 0);
-  const taxAmount = Math.round(subtotal * PHARMACY_GST_RATE * 100) / 100;
+  // Per-item GST, matching the server exactly — pharma spans 5/12/18%.
+  const taxAmount =
+    Math.round(
+      lines.reduce((s, l) => {
+        const med = byId[l.medicineId];
+        if (!med) return s;
+        return s + med.price * l.quantity * (med.gstRate ?? PHARMACY_GST_RATE);
+      }, 0) * 100,
+    ) / 100;
   const total = Math.round((subtotal + taxAmount) * 100) / 100;
+
+  // Only name a rate when every line shares one; a mixed bill would otherwise
+  // print a percentage that does not match the tax actually charged.
+  const gstLabel = useMemo(() => {
+    const rates = new Set(
+      lines
+        .map((l) => byId[l.medicineId])
+        .filter(Boolean)
+        .map((m) => m.gstRate ?? PHARMACY_GST_RATE),
+    );
+    if (rates.size === 1) return ` (${Math.round([...rates][0] * 100)}%)`;
+    return rates.size > 1 ? " (mixed rates)" : "";
+  }, [lines, byId]);
 
   /**
    * `afterBill` clears rather than restoring the prescription prefill: after a
@@ -175,6 +200,14 @@ export function PharmacyBillDialog({
                   >
                     <Trash2 className="size-4" />
                   </Button>
+                  {/* Which physical box to take off the shelf. Stock goes out
+                      first-expiry-first, so this is the lot that will move. */}
+                  {med?.nextBatchNo && (
+                    <p className="w-full text-xs text-muted-foreground">
+                      Dispensing batch <span className="font-medium text-foreground">{med.nextBatchNo}</span>
+                      {med.nextExpiry && <> · expires {formatDate(med.nextExpiry)}</>}
+                    </p>
+                  )}
                 </div>
               );
             })}
@@ -191,7 +224,7 @@ export function PharmacyBillDialog({
               <span>{formatCurrency(subtotal)}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">GST ({Math.round(PHARMACY_GST_RATE * 100)}%)</span>
+              <span className="text-muted-foreground">GST{gstLabel}</span>
               <span>{formatCurrency(taxAmount)}</span>
             </div>
             <div className="flex items-center justify-between pt-1">
