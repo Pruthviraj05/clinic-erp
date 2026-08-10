@@ -27,12 +27,27 @@ export const SESSION_COOKIE = "clinicore_session";
 export const DEMO_ROLE_COOKIE = "clinicore_role";
 
 /**
- * The demo role-switcher hands out a full session with no password. It is a
- * development convenience ONLY: once real credentials are in use, or in a
- * production build, it must not exist — otherwise anyone who knows the URL
- * can sign in as ADMIN and read every patient record.
+ * Whether the password-free role switcher (`/dev-login`) is available.
+ *
+ * It hands out a full session with no password, so it is off by default
+ * everywhere. Two ways to turn it on:
+ *
+ * 1. `NEXT_PUBLIC_DEMO_MODE=true` — an explicit opt-in that works in a
+ *    production build, for showing the app to a client. Every page then
+ *    carries a visible demo banner so it cannot be left on unnoticed, and
+ *    it must never be set on a deployment holding real patient data.
+ * 2. Local development with `NEXT_PUBLIC_AUTH_MODE` not set to credentials.
+ *
+ * A deliberate env flag is used rather than commenting out the auth checks:
+ * it is reversible without a code change, and it cannot be forgotten in a
+ * commit and shipped as a permanent hole.
  */
+export function isDemoModeEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+}
+
 export function isDemoLoginEnabled(): boolean {
+  if (isDemoModeEnabled()) return true;
   if (process.env.NEXT_PUBLIC_AUTH_MODE === "credentials") return false;
   return process.env.NODE_ENV !== "production";
 }

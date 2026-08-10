@@ -37,19 +37,65 @@ async function main() {
   // -------------------------------------------------------------------
   // Admin account — admin@gmail.com / Test@12345
   // -------------------------------------------------------------------
+  // All four accounts share the password `Test@12345` (one precomputed hash).
+  // TEST ACCOUNTS — the password is in the repo, so deactivate or re-password
+  // the doctor/reception/patient logins before real go-live.
+  const SEED_PASSWORD_HASH =
+    "scrypt$7932b2e116b076a54f452848eaabd585$06000d0d587e8c9f8e4837807bfb98b9771cac636d018468d93212910f423e64";
+  const seedCreatedAt = new Date(2026, 0, 1).toISOString();
+
   await upsertMany(db.collection("users"), [
     {
       id: "usr_admin",
       fullName: "Admin",
       email: "admin@gmail.com",
       role: "ADMIN",
-      passwordHash:
-        "scrypt$7932b2e116b076a54f452848eaabd585$06000d0d587e8c9f8e4837807bfb98b9771cac636d018468d93212910f423e64",
+      passwordHash: SEED_PASSWORD_HASH,
       isActive: true,
-      createdAt: new Date(2026, 0, 1).toISOString(),
+      createdAt: seedCreatedAt,
+      // Forced change on first sign-in — this password is public.
+      mustChangePassword: true,
+      sessionVersion: 1,
+    },
+    {
+      id: "usr_doc_bhosikar",
+      fullName: "Dr. Abhijeet Bhosikar",
+      email: "doctor@gmail.com",
+      role: "DOCTOR",
+      passwordHash: SEED_PASSWORD_HASH,
+      linkId: "doc_bhosikar",
+      isActive: true,
+      createdAt: seedCreatedAt,
+      mustChangePassword: false,
+      sessionVersion: 1,
+    },
+    {
+      id: "usr_rec_seed_1",
+      fullName: "Priya Kale",
+      email: "priya.kale@gmail.com",
+      role: "RECEPTIONIST",
+      passwordHash: SEED_PASSWORD_HASH,
+      linkId: "rec_seed_1",
+      branchId: "br_ravet",
+      isActive: true,
+      createdAt: seedCreatedAt,
+      mustChangePassword: false,
+      sessionVersion: 1,
+    },
+    {
+      id: "usr_pat_seed_1",
+      fullName: "Sunita Deshmukh",
+      email: "sunita.deshmukh@example.com",
+      role: "PATIENT",
+      passwordHash: SEED_PASSWORD_HASH,
+      linkId: "pat_seed_1",
+      isActive: true,
+      createdAt: seedCreatedAt,
+      mustChangePassword: false,
+      sessionVersion: 1,
     },
   ]);
-  console.log("Seeded: users (admin@gmail.com)");
+  console.log("Seeded: users (admin / doctor / reception / patient — all Test@12345)");
 
   // -------------------------------------------------------------------
   // Branch + doctor — Dr. Bhosikar's Rheumatology Clinic

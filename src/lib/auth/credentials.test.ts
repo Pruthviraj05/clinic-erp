@@ -86,6 +86,8 @@ describe("authenticate", () => {
     );
   });
 
+  // Six sign-in attempts, each doing a deliberately slow scrypt hash
+  // (~200ms by design), so this needs more than the 5s default.
   it("locks the account after five failures, then refuses even the right password", async () => {
     await makeUser("lock@test.local");
     for (let i = 0; i < 4; i++) {
@@ -99,7 +101,7 @@ describe("authenticate", () => {
     const locked = await authenticate("lock@test.local", PASSWORD);
     expect(locked.ok).toBe(false);
     if (!locked.ok) expect(locked.message).toMatch(/too many failed attempts/i);
-  });
+  }, 30_000);
 
   it("clears the failure count on a successful sign-in", async () => {
     const id = await makeUser("reset@test.local");

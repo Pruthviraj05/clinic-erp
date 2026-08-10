@@ -131,3 +131,52 @@ export const ADMIN_SEED_USER: UserAccount = {
   mustChangePassword: true,
   sessionVersion: 1,
 };
+
+/**
+ * One sign-in-able account per role, so every login path can be exercised
+ * with known credentials. All share the admin's password `Test@12345` (same
+ * precomputed hash — never hash at module load, scrypt is deliberately slow).
+ *
+ * TEST ACCOUNTS: deactivate or re-password these before real go-live; the
+ * password is in the repo. They intentionally skip the forced first-login
+ * password change so each role can be checked quickly.
+ */
+export const SEED_LOGIN_ACCOUNTS: UserAccount[] = [
+  {
+    id: "usr_doc_bhosikar",
+    fullName: "Dr. Abhijeet Bhosikar",
+    email: "doctor@gmail.com",
+    role: "DOCTOR",
+    passwordHash: ADMIN_SEED_USER.passwordHash,
+    linkId: "doc_bhosikar",
+    isActive: true,
+    createdAt: new Date(2026, 0, 1).toISOString(),
+    mustChangePassword: false,
+    sessionVersion: 1,
+  },
+  {
+    id: "usr_rec_seed_1",
+    fullName: "Priya Kale",
+    email: "priya.kale@gmail.com",
+    role: "RECEPTIONIST",
+    passwordHash: ADMIN_SEED_USER.passwordHash,
+    linkId: "rec_seed_1",
+    branchId: "br_ravet",
+    isActive: true,
+    createdAt: new Date(2026, 0, 1).toISOString(),
+    mustChangePassword: false,
+    sessionVersion: 1,
+  },
+  {
+    id: "usr_pat_seed_1",
+    fullName: "Sunita Deshmukh",
+    email: "sunita.deshmukh@example.com",
+    role: "PATIENT",
+    passwordHash: ADMIN_SEED_USER.passwordHash,
+    linkId: "pat_seed_1",
+    isActive: true,
+    createdAt: new Date(2026, 0, 1).toISOString(),
+    mustChangePassword: false,
+    sessionVersion: 1,
+  },
+];

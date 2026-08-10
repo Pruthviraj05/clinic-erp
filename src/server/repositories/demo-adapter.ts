@@ -24,7 +24,7 @@ import {
   type MasterRow,
 } from "@/server/demo/extra";
 import { SEED_RX_TEMPLATES } from "@/server/demo/template-store";
-import { ADMIN_SEED_USER } from "@/server/demo/users-store";
+import { ADMIN_SEED_USER, SEED_LOGIN_ACCOUNTS } from "@/server/demo/users-store";
 import { prescriptionTemplate } from "@/server/demo/settings-store";
 import type { RxTemplate } from "@/server/demo/template-store";
 import type { DiseaseGroup } from "@/server/demo/disease-store";
@@ -602,7 +602,7 @@ const stockMovementsRows: StockMovementItem[] = [
   },
 ];
 const auditLogRows: AuditRow[] = [];
-const usersRows: UserAccount[] = [ADMIN_SEED_USER];
+const usersRows: UserAccount[] = [ADMIN_SEED_USER, ...SEED_LOGIN_ACCOUNTS];
 const rxTemplatesRows: RxTemplate[] = [...SEED_RX_TEMPLATES];
 const diseaseGroupsRows: DiseaseGroup[] = [];
 const rxDesignsRows: (RxDesign & { id: string })[] = [];

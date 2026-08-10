@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Activity, ShieldCheck } from "lucide-react";
-import { getSession } from "@/lib/session";
+import { getSession, isDemoModeEnabled } from "@/lib/session";
 import { ROLE_HOME } from "@/lib/rbac";
 import { appConfig } from "@/config/app.config";
 import { RolePicker } from "@/features/auth/role-picker";
@@ -70,13 +70,21 @@ export default async function LoginPage() {
             </p>
           </div>
 
-          {appConfig.authMode === "credentials" ? <PasswordForm /> : <RolePicker />}
+          {appConfig.authMode === "credentials" && !isDemoModeEnabled() ? <PasswordForm /> : <RolePicker />}
 
-          <p className="text-center text-xs text-muted-foreground">
-            {appConfig.authMode === "credentials"
-              ? "Trouble signing in? Contact your clinic administrator."
-              : "Email/password sign-in is ready — set NEXT_PUBLIC_AUTH_MODE=credentials to enable it."}
-          </p>
+          {isDemoModeEnabled() ? (
+            <p className="rounded-lg border border-[var(--warning)]/40 bg-[var(--warning)]/10 p-3 text-center text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Demo mode.</span> Pick a role above to sign in
+              without a password. Turn this off by removing <code>NEXT_PUBLIC_DEMO_MODE</code> before using
+              real patient data.
+            </p>
+          ) : (
+            <p className="text-center text-xs text-muted-foreground">
+              {appConfig.authMode === "credentials"
+                ? "Trouble signing in? Contact your clinic administrator."
+                : "Email/password sign-in is ready — set NEXT_PUBLIC_AUTH_MODE=credentials to enable it."}
+            </p>
+          )}
         </div>
       </div>
     </div>

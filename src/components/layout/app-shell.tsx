@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { AppShellClient } from "./app-shell-client";
+import { DemoBanner } from "./demo-banner";
 import type { SessionUser } from "@/lib/session";
 import { db } from "@/server/repositories";
 
@@ -31,15 +32,18 @@ export async function AppShell({
   const initialCollapsed = store.get("cc_sidebar")?.value === "1";
 
   return (
-    <AppShellClient
-      role={user.role}
-      name={user.fullName}
-      email={user.email}
-      branchName={branchName}
-      unread={unread}
-      initialCollapsed={initialCollapsed}
-    >
-      {children}
-    </AppShellClient>
+    <>
+      <DemoBanner />
+      <AppShellClient
+        role={user.role}
+        name={user.fullName}
+        email={user.email}
+        branchName={branchName}
+        unread={unread}
+        initialCollapsed={initialCollapsed}
+      >
+        {children}
+      </AppShellClient>
+    </>
   );
 }

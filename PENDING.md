@@ -88,6 +88,42 @@ from one location.
 
 ---
 
+## 1b. Showing a demo to a client (no login needed)
+
+Set one environment variable — in Vercel, or in `.env.local` to run it locally:
+
+```
+NEXT_PUBLIC_DEMO_MODE=true
+```
+
+The login page becomes a one-click role switcher — **Admin, Doctor,
+Receptionist, Patient — no password**. It overrides the credentials setting
+and works on the deployed site.
+
+While it is on, every page shows a bright warning strip. That is deliberate:
+it is the thing that stops it being left on by accident.
+
+**Turn it off before the clinic uses this for real.** Remove the variable (or
+set it to anything other than `true`) and passwords are required again
+immediately — `/dev-login` starts returning 404 and any demo session already
+issued stops working. Both directions are verified.
+
+If you would rather demo with passwords, all four accounts use `Test@12345`:
+
+| Role | Email |
+|---|---|
+| Admin | `admin@gmail.com` |
+| Doctor | `doctor@gmail.com` |
+| Receptionist | `priya.kale@gmail.com` |
+| Patient | `sunita.deshmukh@example.com` |
+
+These are test accounts and their password is in the repo — **deactivate or
+re-password the doctor/reception/patient logins before go-live.** The admin
+account is forced to change its password at first sign-in; the other three
+skip that, so a demo isn't interrupted.
+
+---
+
 ## 2. Clinic details still using placeholders **[YOU]**
 
 Everything here renders on prescriptions, invoices and the portal, so it is worth
