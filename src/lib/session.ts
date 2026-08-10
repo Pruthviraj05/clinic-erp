@@ -49,6 +49,8 @@ export interface SessionUser {
   branchIds: string[];
   /** The linked Doctor/Receptionist/Patient record id (scoping key for DOCTOR/RECEPTIONIST/PATIENT roles). */
   linkId?: string;
+  /** True while the account still has its issued/seed password. */
+  mustChangePassword?: boolean;
 }
 
 export interface Session {
@@ -61,27 +63,59 @@ function sign(value: string): string {
   return createHmac("sha256", secret).update(value).digest("hex");
 }
 
-/** `<userId>.<hmac>` — the value stored in the session cookie. */
-export function signSessionToken(userId: string): string {
-  return `${userId}.${sign(userId)}`;
+/** How long a session stays valid before the user must sign in again. */
+export const SESSION_MAX_AGE_SECONDS = 12 * 60 * 60; // 12 hours
+
+/**
+ * `<userId>.<issuedAt>.<sessionVersion>.<hmac>` — the value in the cookie.
+ *
+ * The payload carries an issue time and the account's session version so a
+ * session can actually be ended. Previously the token was a pure function of
+ * the user id: it never expired, and signing out only deleted the client-side
+ * cookie — a copied cookie stayed valid forever.
+ */
+export function signSessionToken(userId: string, sessionVersion = 1): string {
+  const payload = `${userId}.${Math.floor(Date.now() / 1000)}.${sessionVersion}`;
+  return `${payload}.${sign(payload)}`;
 }
 
-/** Verifies the HMAC and returns the userId, or null if tampered/invalid. */
-function verifySessionToken(token: string): string | null {
+interface TokenClaims {
+  userId: string;
+  issuedAt: number;
+  sessionVersion: number;
+}
+
+/** Verifies the HMAC and expiry, returning the claims or null. */
+function verifySessionToken(token: string): TokenClaims | null {
   const dot = token.lastIndexOf(".");
   if (dot < 1) return null;
-  const userId = token.slice(0, dot);
+  const payload = token.slice(0, dot);
   const providedSig = token.slice(dot + 1);
-  const expectedSig = sign(userId);
+  const expectedSig = sign(payload);
   const a = Buffer.from(providedSig);
   const b = Buffer.from(expectedSig);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-  return userId;
+
+  const parts = payload.split(".");
+  if (parts.length !== 3) return null;
+  const [userId, issuedRaw, versionRaw] = parts;
+  const issuedAt = Number(issuedRaw);
+  const sessionVersion = Number(versionRaw);
+  if (!userId || !Number.isFinite(issuedAt) || !Number.isFinite(sessionVersion)) return null;
+
+  const ageSeconds = Math.floor(Date.now() / 1000) - issuedAt;
+  // Reject expired tokens, and tokens issued in the future (clock tampering).
+  if (ageSeconds > SESSION_MAX_AGE_SECONDS || ageSeconds < -60) return null;
+
+  return { userId, issuedAt, sessionVersion };
 }
 
-async function resolveRealUser(userId: string): Promise<SessionUser | null> {
-  const account = await db.users.get(userId);
+async function resolveRealUser(claims: TokenClaims): Promise<SessionUser | null> {
+  const account = await db.users.get(claims.userId);
   if (!account || !account.isActive) return null;
+  // Signing out, deactivating an account or changing a password bumps this,
+  // which instantly invalidates every token issued before that point.
+  if ((account.sessionVersion ?? 1) !== claims.sessionVersion) return null;
 
   let branchId: string | undefined;
   let branchIds: string[] = [];
@@ -106,6 +140,7 @@ async function resolveRealUser(userId: string): Promise<SessionUser | null> {
     branchId,
     branchIds,
     linkId: account.linkId,
+    mustChangePassword: account.mustChangePassword ?? false,
   };
 }
 
@@ -118,9 +153,9 @@ export const getSession = cache(async (): Promise<Session | null> => {
 
   const sessionToken = store.get(SESSION_COOKIE)?.value;
   if (sessionToken) {
-    const userId = verifySessionToken(sessionToken);
-    if (userId) {
-      const user = await resolveRealUser(userId);
+    const claims = verifySessionToken(sessionToken);
+    if (claims) {
+      const user = await resolveRealUser(claims);
       if (user) return { user };
     }
   }

@@ -25,6 +25,9 @@ function createClientPromise(): Promise<MongoClient> {
     );
   }
   const client = new MongoClient(uri, {
+    // Set in code, not left to the URI: patient data must never travel in
+    // plaintext because someone edited a connection string.
+    tls: true,
     // Pool size is PER serverless instance. Vercel can run hundreds of them
     // concurrently, and an Atlas M10 caps out at 1,500 connections — so a
     // generous per-instance pool is what exhausts the cluster during a

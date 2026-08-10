@@ -10,6 +10,9 @@ import { can, ROLE_HOME, type Module, type PermissionAction, type Role } from "@
 export async function requireRole(...allowed: Role[]): Promise<Session> {
   const session = await getSession();
   if (!session) redirect("/login");
+  // Enforced here rather than only after login, so the forced change cannot
+  // be skipped by navigating straight to a page.
+  if (session.user.mustChangePassword) redirect("/change-password");
   if (allowed.length && !allowed.includes(session.user.role)) {
     redirect(ROLE_HOME[session.user.role]);
   }
@@ -27,6 +30,7 @@ export async function requirePermission(
 ): Promise<Session> {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.user.mustChangePassword) redirect("/change-password");
   if (!can(session.user.role, module, action)) {
     redirect(ROLE_HOME[session.user.role]);
   }

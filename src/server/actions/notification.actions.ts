@@ -20,6 +20,16 @@ function revalidateNotificationRoutes() {
 export async function markNotificationReadAction(id: string): Promise<ActionResult> {
   const authz = await authorize("notifications", "view");
   if (!authz.ok) return authz;
+  const { user } = authz.session;
+
+  // Only your own (or a broadcast) notification — the id alone is not
+  // authority to mutate someone else's row.
+  const existing = await db.notifications.get(id);
+  if (!existing) return { ok: false, message: "Notification not found." };
+  if (existing.recipientId && existing.recipientId !== user.linkId) {
+    return { ok: false, message: "Notification not found." };
+  }
+
   const updated = await db.notifications.update(id, { read: true });
   if (!updated) return { ok: false, message: "Notification not found." };
   revalidateNotificationRoutes();

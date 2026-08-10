@@ -33,22 +33,22 @@ describe("admin creates admin", () => {
   it("creates an administrator whose password verifies", async () => {
     const res = await createAdminAction(
       null,
-      fd({ fullName: "Priya Deshmukh", email: "priya.admin@clinicore.app", password: "Strong@123" }),
+      fd({ fullName: "Priya Deshmukh", email: "priya.admin@clinicore.app", password: "Str0ng-Passphrase!" }),
     );
     expect(res.ok).toBe(true);
 
     const created = (await findByEmail("priya.admin@clinicore.app"))!;
     expect(created.role).toBe("ADMIN");
     expect(created.isActive).toBe(true);
-    expect(created.passwordHash).not.toContain("Strong@123");
-    expect(verifyPassword("Strong@123", created.passwordHash)).toBe(true);
-    expect(verifyPassword("Strong@124", created.passwordHash)).toBe(false);
+    expect(created.passwordHash).not.toContain("Str0ng-Passphrase!");
+    expect(verifyPassword("Str0ng-Passphrase!", created.passwordHash)).toBe(true);
+    expect(verifyPassword("Wr0ng-Passphrase!", created.passwordHash)).toBe(false);
   });
 
   it("rejects duplicate emails", async () => {
     const res = await createAdminAction(
       null,
-      fd({ fullName: "Copy Cat", email: "priya.admin@clinicore.app", password: "Strong@123" }),
+      fd({ fullName: "Copy Cat", email: "priya.admin@clinicore.app", password: "Str0ng-Passphrase!" }),
     );
     expect(res.ok).toBe(false);
     expect(res.fieldErrors?.email).toBeDefined();
@@ -61,6 +61,31 @@ describe("admin creates admin", () => {
     );
     expect(res.ok).toBe(false);
     expect(res.fieldErrors?.password).toBeDefined();
+  });
+
+  it("rejects passwords under the 12-character minimum", async () => {
+    // "Strong@123" satisfied the old min(8)+letter+digit rule; length is what
+    // actually resists guessing, so the policy is now length-first.
+    const res = await createAdminAction(
+      null,
+      fd({ fullName: "Old Policy", email: "oldpolicy@clinicore.app", password: "Strong@123" }),
+    );
+    expect(res.ok).toBe(false);
+    expect(res.fieldErrors?.password?.[0]).toMatch(/12 characters/i);
+  });
+
+  it("forces a password change on a newly created admin", async () => {
+    const created = (await findByEmail("priya.admin@clinicore.app"))!;
+    expect(created.mustChangePassword).toBe(true);
+  });
+
+  it("revokes live sessions when an account is deactivated", async () => {
+    const target = (await findByEmail("priya.admin@clinicore.app"))!;
+    const before = target.sessionVersion ?? 1;
+    await setUserActiveAction(target.id, false);
+    const after = (await db.users.get(target.id))!;
+    expect(after.sessionVersion).toBeGreaterThan(before);
+    await setUserActiveAction(target.id, true);
   });
 
   it("deactivates and reactivates an account", async () => {
@@ -88,7 +113,7 @@ describe("admin creates admin", () => {
     currentRole.value = "DOCTOR";
     const res = await createAdminAction(
       null,
-      fd({ fullName: "Sneaky Doc", email: "sneaky@clinicore.app", password: "Strong@123" }),
+      fd({ fullName: "Sneaky Doc", email: "sneaky@clinicore.app", password: "Str0ng-Passphrase!" }),
     );
     expect(res.ok).toBe(false);
     expect(res.message).toMatch(/permission/i);

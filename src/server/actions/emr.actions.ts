@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { newId } from "@/lib/ids";
+import { uploadDataUrlSchema } from "@/lib/upload-validation";
 import { z } from "zod";
 import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
@@ -14,7 +15,7 @@ const medicalRecordSchema = z.object({
   title: z.string().trim().min(2, "Give the record a title").max(120),
   category: z.string().trim().min(1, "Pick or type a category").max(60),
   notes: z.string().trim().max(1000).optional(),
-  fileDataUrl: z.string().max(6_000_000, "File is too large").optional(),
+  fileDataUrl: uploadDataUrlSchema,
   fileType: z.string().max(20).optional(),
   fileSize: z.string().max(20).optional(),
 });

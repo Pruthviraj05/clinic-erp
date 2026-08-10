@@ -47,9 +47,35 @@ node --env-file=.env.local scripts/seed-mongodb.mjs
 Indexes first. Without them every lookup — including login — scans the whole
 collection. Both scripts are safe to re-run.
 
-### 1.4 Change the admin password immediately after first login **[YOU]**
-Ships as `admin@gmail.com` / `Test@12345`. Change it in Settings → Administrators
-before anyone else has the URL.
+### 1.4 Change the admin password at first login **[YOU]**
+Ships as `admin@gmail.com` / `Test@12345`. The app now **forces** this — the
+first sign-in redirects to a change-password screen and nothing else is
+reachable until it is done. New passwords must be at least 12 characters.
+
+### 1.5 Turn on Vercel Deployment Protection **[YOU]** — the real lock-down
+You asked that nobody be able to reach this application. That cannot be done
+in application code: code can only decide what happens *after* a request
+arrives. The perimeter is a Vercel setting.
+
+**Vercel → Project → Settings → Deployment Protection**, then either:
+- **Password Protection** — one shared password in front of the whole site, or
+- **Vercel Authentication** — only your Vercel team members can load it.
+
+Both sit in front of the app, so the login page is not even visible to the
+public internet. Production-domain protection needs a Pro plan.
+
+Optionally also **Vercel Firewall → IP allowlist**, restricted to the clinic's
+static IP. That blocks remote/mobile access, so only do it if the clinic works
+from one location.
+
+### 1.6 Lock down MongoDB Atlas **[YOU]**
+- **Network Access** must not be `0.0.0.0/0`. Vercel's egress IPs are dynamic,
+  so the correct answer is a **Private Endpoint / VPC Peering** (M10+), not a
+  wide allowlist.
+- The current connection string uses `authSource=admin` — create a
+  **least-privilege database user** scoped to the `clinicore` database only.
+- **Rotate the credentials** in `.env.local`. They have been sitting in
+  plaintext on a developer machine.
 
 ---
 
@@ -112,6 +138,49 @@ Recorded so you know what changed.
 
 ---
 
+## 4b. Security hardening added
+
+**Login**
+- **Brute force is now blocked.** There was none at all before. An account
+  locks for 15 minutes after 5 failed attempts, and there is a separate
+  per-IP cap so one password cannot be sprayed across many accounts.
+- **Failure messages no longer reveal whether an email exists** — that was a
+  free way to enumerate real staff accounts.
+- **Staff temp passwords used `Math.random()`**, a predictable generator whose
+  internal state can be recovered from a few outputs. Every doctor and
+  receptionist password was generated that way. Now cryptographically random.
+- **Password hashing strengthened** from Node's default cost to OWASP's
+  memory-constrained profile (~200 ms/hash instead of ~25 ms). The cost is now
+  stored inside the hash, so it can be raised again later, and existing
+  passwords are upgraded automatically on next sign-in.
+- **Password minimum raised to 12 characters.** The old rule accepted
+  `password1`.
+- **Issued passwords must be changed at first sign-in** — seed admin,
+  admin-created accounts, and auto-created staff accounts.
+
+**Sessions**
+- **Sessions used to last forever and could not be revoked.** The cookie was a
+  plain function of the user id, and signing out only deleted the local copy —
+  a copied cookie stayed valid indefinitely. Tokens now expire after 12 hours
+  and carry a version that is bumped on sign-out, password change and
+  deactivation, which kills every existing session immediately.
+- Cookies now set `secure` in production.
+
+**Transport & browser**
+- **All security headers added** (there were none): HSTS, Content-Security-Policy
+  with `frame-ancestors 'none'`, X-Frame-Options, X-Content-Type-Options,
+  Referrer-Policy, Permissions-Policy, plus `no-store` so patient data is never
+  cached by an intermediary. The framework banner header is removed.
+- **TLS to MongoDB is enforced in code**, so it cannot be silently dropped by
+  editing a connection string.
+
+**Input**
+- **Uploads are validated server-side** — type and size. Previously only the
+  browser checked, and a signature had no size limit at all, so an
+  authenticated caller could POST an arbitrary multi-megabyte blob.
+- **A patient could create a consent form naming another patient**; now blocked.
+- **Notification read-state accepted any ID from any user**; now ownership-checked.
+
 ## 5. Performance and scale
 
 ### Done this session
@@ -156,9 +225,36 @@ Real, reproducible, but lower blast radius than section 4.
 
 ---
 
+## 6b. Security work still outstanding **[DEV]**
+
+Ordered by value. None of these is a live hole; they are depth.
+
+1. **Two-factor authentication for admin accounts.** The single highest-value
+   remaining item, and the usual expectation for medical records.
+2. **Rate limiting is per-server-instance.** It uses in-memory counters, so an
+   attacker spread across many cold starts gets more attempts than the nominal
+   limit. A shared store (Upstash/Redis, or a Mongo TTL collection) makes the
+   limit exact. Account lockout is unaffected — that one is stored in the database.
+3. **Nothing is encrypted at the application layer.** Atlas encrypts at rest
+   automatically, which covers disk theft — but anyone holding the connection
+   string reads everything in plaintext. Options, in order of cost:
+   least-privilege DB user (do this regardless); AES-GCM on non-searchable
+   fields like notes and uploaded files; Atlas Queryable Encryption for
+   searchable fields such as name and phone — note that this **breaks the
+   current name/phone search**, which is why I did not do it unilaterally.
+4. **The audit log is not tamper-evident.** No code path edits it, but nothing
+   structurally prevents it. A hash chain would make any later edit detectable.
+5. **Uploads should move to real file storage** rather than base64 inside
+   documents, with signed time-limited URLs.
+6. **India DPDP Act** (medical records = sensitive personal data): privacy
+   notice and consent at registration — the existing consent module is
+   *clinical procedure* consent, not data-processing consent — plus a
+   retention schedule, patient access/erasure requests, a breach runbook, and
+   confirmation that the Atlas cluster is in an Indian region.
+
 ## 7. Not started
 
-- Rate limiting / lockout on login, and 2FA
+- 2FA (see 6b.1)
 - Cancel/void an invoice (nothing can currently reverse a pharmacy bill, so stock cannot be restored)
 - Real WhatsApp/email sending (all notifications are in-app simulations)
 - OCR for supplier bill photos — currently the photo is stored as a reference document only; quantities are typed or imported from CSV
@@ -168,6 +264,6 @@ Real, reproducible, but lower blast radius than section 4.
 
 ## Verification status
 
-- 100 automated tests passing (16 files), including new regression tests for every scoping fix
+- 114 automated tests passing (17 files), including regression tests for every scoping fix and the login hardening
 - TypeScript, ESLint and the production build are clean
 - All 56 routes return 200 for every role

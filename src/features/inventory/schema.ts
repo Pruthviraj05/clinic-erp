@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { uploadDataUrlSchema } from "@/lib/upload-validation";
 
 export const addMedicineSchema = z.object({
   name: z.string().min(1, "Name is required").max(120),
@@ -30,7 +31,7 @@ export const adjustStockSchema = z.object({
   quantity: z.coerce.number().int().min(1).max(1000000),
   reason: z.string().min(1, "Reason is required").max(200),
   /** Optional supplier-bill photo, base64 data URL (no object storage yet). */
-  billPhotoDataUrl: z.string().max(6_000_000).optional(),
+  billPhotoDataUrl: uploadDataUrlSchema,
 });
 export type AdjustStockInput = z.infer<typeof adjustStockSchema>;
 
@@ -55,6 +56,6 @@ export type ImportStockRow = z.infer<typeof importStockRowSchema>;
 export const importStockSchema = z.object({
   rows: z.array(importStockRowSchema).min(1, "Nothing to import").max(500, "Import at most 500 rows at a time"),
   reference: z.string().max(200).optional(),
-  billPhotoDataUrl: z.string().max(6_000_000).optional(),
+  billPhotoDataUrl: uploadDataUrlSchema,
 });
 export type ImportStockInput = z.infer<typeof importStockSchema>;

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { newId } from "@/lib/ids";
+import { passwordSchema } from "@/lib/auth/password-policy";
 import { z } from "zod";
 import { authorize } from "@/lib/guard";
 import { hashPassword } from "@/server/demo/users-store";
@@ -18,11 +19,9 @@ import type { ActionResult } from "./appointment.actions";
 const adminSchema = z.object({
   fullName: z.string().trim().min(2, "Full name is required").max(100),
   email: z.string().trim().email("Invalid email"),
-  password: z
-    .string()
-    .min(8, "At least 8 characters")
-    .regex(/[A-Za-z]/, "Include a letter")
-    .regex(/[0-9]/, "Include a number"),
+  // Shared policy — see password.actions.ts. Length beats composition rules:
+  // the old min(8) + letter + digit happily accepted "password1".
+  password: passwordSchema,
 });
 
 export async function createAdminAction(
@@ -54,6 +53,9 @@ export async function createAdminAction(
     passwordHash: hashPassword(input.password),
     isActive: true,
     createdAt: new Date().toISOString(),
+    // The creating admin knows this password, so it is shared from the start.
+    mustChangePassword: true,
+    sessionVersion: 1,
   };
   await db.users.insert(created);
 
@@ -76,13 +78,17 @@ export async function setUserActiveAction(id: string, active: boolean): Promise<
   const account = await db.users.get(id);
   if (!account) return { ok: false, message: "Account not found." };
   if (!active && account.role === "ADMIN") {
-    const accounts = await db.users.list();
-    if (accounts.filter((u) => u.role === "ADMIN" && u.isActive).length <= 1) {
+    const activeAdmins = await db.users.count({ role: "ADMIN", isActive: true });
+    if (activeAdmins <= 1) {
       return { ok: false, message: "At least one active administrator is required." };
     }
   }
 
-  await db.users.update(id, { isActive: active });
+  // Deactivating revokes any session already open, not just the next sign-in.
+  await db.users.update(id, {
+    isActive: active,
+    ...(active ? {} : { sessionVersion: (account.sessionVersion ?? 1) + 1 }),
+  });
   await logAudit({
     actor: user.fullName,
     role: user.role,

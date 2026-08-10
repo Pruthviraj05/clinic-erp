@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { randomBytes } from "node:crypto";
 import { newId } from "@/lib/ids";
 import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
@@ -10,9 +11,15 @@ import { branchSchema, doctorSchema, receptionistSchema } from "@/features/staff
 import type { ActionResult } from "./appointment.actions";
 import type { Branch, Doctor, Receptionist } from "@/types/domain";
 
+/**
+ * Cryptographically random temp password.
+ *
+ * `Math.random()` is a non-cryptographic PRNG whose internal state can be
+ * recovered from a few outputs — it must never generate a credential. These
+ * are real staff login passwords.
+ */
 function randomTempPassword(): string {
-  const raw = Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 6);
-  return `${raw}9!`;
+  return `${randomBytes(12).toString("base64url")}9!`;
 }
 
 /**
@@ -32,9 +39,12 @@ async function syncLinkedAccount(
   linkId: string,
   patch: { isActive?: boolean; email?: string; fullName?: string; branchId?: string },
 ): Promise<void> {
-  const accounts = await db.users.list((u) => u.linkId === linkId);
+  const accounts = await db.users.find({ linkId });
   for (const account of accounts) {
-    await db.users.update(account.id, patch);
+    // Deactivating must also kill any session already open in their browser,
+    // not just block the next sign-in.
+    const revoke = patch.isActive === false ? { sessionVersion: (account.sessionVersion ?? 1) + 1 } : {};
+    await db.users.update(account.id, { ...patch, ...revoke });
   }
 }
 
@@ -60,6 +70,10 @@ async function createStaffAccount(
     branchId,
     isActive: true,
     createdAt: new Date().toISOString(),
+    // The admin reads this password out loud to the new staff member, so it
+    // is a shared secret from birth — force a change at first sign-in.
+    mustChangePassword: true,
+    sessionVersion: 1,
   });
   return password;
 }

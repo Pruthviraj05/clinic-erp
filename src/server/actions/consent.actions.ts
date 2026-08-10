@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { newId } from "@/lib/ids";
+import { signatureDataUrlSchema } from "@/lib/upload-validation";
 import { z } from "zod";
 import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
@@ -44,6 +45,12 @@ export async function createConsentAction(
     return { ok: false, message: "Please fix the highlighted fields.", fieldErrors: parsed.error.flatten().fieldErrors };
   }
   const input = parsed.data;
+
+  // A patient may only create a form naming themselves — otherwise they can
+  // inject forms for other patients into a doctor's queue.
+  if (user.role === "PATIENT" && input.patientId !== user.linkId) {
+    return { ok: false, message: "You can only create consent forms for yourself." };
+  }
 
   const [patient, doctor] = await Promise.all([db.patients.get(input.patientId), db.doctors.get(input.doctorId)]);
   if (!patient || !doctor) return { ok: false, message: "Invalid patient or doctor." };
@@ -149,8 +156,11 @@ export async function signConsentAction(
 ): Promise<ActionResult> {
   const authz = await authorize("consent", "create");
   if (!authz.ok) return authz;
-  if (!signatureDataUrl || !signatureDataUrl.startsWith("data:image")) {
-    return { ok: false, message: "Please provide a signature before submitting." };
+  // `startsWith("data:image")` accepted an unbounded string of any image-ish
+  // type; this checks the encoding, the MIME type and the size.
+  const signatureCheck = signatureDataUrlSchema.safeParse(signatureDataUrl ?? "");
+  if (!signatureCheck.success) {
+    return { ok: false, message: "Please provide a valid signature before submitting." };
   }
   const form = await db.consentForms.get(id);
   if (!form) return { ok: false, message: "Consent form not found." };
