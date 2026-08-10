@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { AlertTriangle, Send, Loader2, ArrowDownRight, ArrowUpRight, MoreHorizontal, Pencil } from "lucide-react";
+import { AlertTriangle, Send, Loader2, ArrowDownRight, ArrowUpRight, MoreHorizontal, Pencil, Paperclip } from "lucide-react";
 import { toast } from "sonner";
 import { DataTable } from "@/components/shared/data-table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { AddMedicineDialog } from "./add-medicine-dialog";
 import { AdjustStockDialog } from "./adjust-stock-dialog";
 import { EditMedicineDialog } from "./edit-medicine-dialog";
+import { ImportStockDialog } from "./import-stock-dialog";
 import { sendLowStockAlertAction, setMedicineActiveAction } from "@/server/actions/inventory.actions";
 import type { Medicine, StockMovementItem } from "@/types/domain";
 
@@ -229,6 +230,23 @@ export function InventoryView({
       { accessorKey: "balanceAfter", header: "Balance" },
       { accessorKey: "reason", header: "Reason", cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.reason}</span> },
       { accessorKey: "by", header: "By" },
+      {
+        id: "bill",
+        header: "Bill",
+        cell: ({ row }) =>
+          row.original.billPhotoDataUrl ? (
+            <a
+              href={row.original.billPhotoDataUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+            >
+              <Paperclip className="size-3.5" /> View
+            </a>
+          ) : (
+            <span className="text-sm text-muted-foreground">—</span>
+          ),
+      },
     ],
     [],
   );
@@ -263,7 +281,16 @@ export function InventoryView({
               Expiry: formatDate(m.nearestExpiry),
               UpdatedBy: m.updatedBy ?? "",
             })}
-            toolbar={<AddMedicineDialog />}
+            toolbar={
+              canEdit ? (
+                <>
+                  <ImportStockDialog medicines={medicines} />
+                  <AddMedicineDialog />
+                </>
+              ) : (
+                <AddMedicineDialog />
+              )
+            }
           />
         </TabsContent>
 

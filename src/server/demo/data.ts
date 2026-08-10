@@ -37,7 +37,7 @@ function atToday(hour: number, minute = 0): string {
   d.setHours(hour, minute, 0, 0);
   return d.toISOString();
 }
-function daysFromNow(days: number, hour = 10, minute = 0): string {
+export function daysFromNow(days: number, hour = 10, minute = 0): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
   d.setHours(hour, minute, 0, 0);
@@ -85,9 +85,29 @@ export const doctors: Doctor[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Receptionists — none seeded; admin adds real staff via the UI
+// Receptionists — sample front-desk staff so the reception screens demo with
+// a real-looking user. Admin replaces/adds actual staff via the UI.
 // ---------------------------------------------------------------------------
-export const receptionists: Receptionist[] = [];
+export const receptionists: Receptionist[] = [
+  {
+    id: "rec_seed_1",
+    userId: "usr_rec_seed_1",
+    fullName: "Priya Kale",
+    email: "priya.kale@gmail.com",
+    branchId: "br_ravet",
+    employeeCode: "EMP-001",
+    isActive: true,
+  },
+  {
+    id: "rec_seed_2",
+    userId: "usr_rec_seed_2",
+    fullName: "Sneha Patil",
+    email: "sneha.patil@gmail.com",
+    branchId: "br_ravet",
+    employeeCode: "EMP-002",
+    isActive: true,
+  },
+];
 
 // ---------------------------------------------------------------------------
 // Patients — 3 sample patients with a plausible rheumatology history, for
@@ -390,34 +410,99 @@ export const invoices: Invoice[] = [
 // ---------------------------------------------------------------------------
 // Medicines — rheumatology-focused formulary
 // ---------------------------------------------------------------------------
+// Opening stock is sample data: roughly 3–8× reorder level, with two items
+// deliberately at/below reorder level (med_15, med_19) so the low-stock alert
+// demos, and one batch (med_10) expiring inside 30 days so the expiry card is
+// non-zero. Real counts come from the clinic's first physical stock take.
 export const medicines: Medicine[] = [
-  { id: "med_1", name: "Etoricoxib 90mg", genericName: "Etoricoxib", category: "NSAID", brand: null, unit: "Tablet", reorderLevel: 20, stockQty: 0, sellPrice: 12, nearestExpiry: null, isActive: true },
-  { id: "med_2", name: "Diclofenac 50mg", genericName: "Diclofenac Sodium", category: "NSAID", brand: null, unit: "Tablet", reorderLevel: 20, stockQty: 0, sellPrice: 4, nearestExpiry: null, isActive: true },
-  { id: "med_3", name: "Aceclofenac 100mg + Paracetamol 325mg", genericName: "Aceclofenac + Paracetamol", category: "NSAID", brand: null, unit: "Tablet", reorderLevel: 20, stockQty: 0, sellPrice: 8, nearestExpiry: null, isActive: true },
-  { id: "med_4", name: "Methotrexate 7.5mg", genericName: "Methotrexate", category: "DMARD", brand: null, unit: "Tablet", reorderLevel: 10, stockQty: 0, sellPrice: 15, nearestExpiry: null, isActive: true },
-  { id: "med_5", name: "Sulfasalazine 500mg", genericName: "Sulfasalazine", category: "DMARD", brand: null, unit: "Tablet", reorderLevel: 10, stockQty: 0, sellPrice: 9, nearestExpiry: null, isActive: true },
-  { id: "med_6", name: "Hydroxychloroquine 200mg", genericName: "Hydroxychloroquine Sulfate", category: "DMARD", brand: null, unit: "Tablet", reorderLevel: 10, stockQty: 0, sellPrice: 11, nearestExpiry: null, isActive: true },
-  { id: "med_7", name: "Leflunomide 20mg", genericName: "Leflunomide", category: "DMARD", brand: null, unit: "Tablet", reorderLevel: 10, stockQty: 0, sellPrice: 22, nearestExpiry: null, isActive: true },
-  { id: "med_8", name: "Prednisolone 5mg", genericName: "Prednisolone", category: "Steroid", brand: null, unit: "Tablet", reorderLevel: 15, stockQty: 0, sellPrice: 3, nearestExpiry: null, isActive: true },
-  { id: "med_9", name: "Febuxostat 40mg", genericName: "Febuxostat", category: "Gout Management", brand: null, unit: "Tablet", reorderLevel: 15, stockQty: 0, sellPrice: 14, nearestExpiry: null, isActive: true },
-  { id: "med_10", name: "Colchicine 0.5mg", genericName: "Colchicine", category: "Gout Management", brand: null, unit: "Tablet", reorderLevel: 15, stockQty: 0, sellPrice: 6, nearestExpiry: null, isActive: true },
-  { id: "med_11", name: "Allopurinol 100mg", genericName: "Allopurinol", category: "Gout Management", brand: null, unit: "Tablet", reorderLevel: 15, stockQty: 0, sellPrice: 5, nearestExpiry: null, isActive: true },
-  { id: "med_12", name: "Calcium 500mg + Vitamin D3 250IU", genericName: "Calcium Carbonate + Cholecalciferol", category: "Bone Health", brand: null, unit: "Tablet", reorderLevel: 25, stockQty: 0, sellPrice: 7, nearestExpiry: null, isActive: true },
-  { id: "med_13", name: "Vitamin D3 60000IU", genericName: "Cholecalciferol", category: "Bone Health", brand: null, unit: "Sachet", reorderLevel: 20, stockQty: 0, sellPrice: 30, nearestExpiry: null, isActive: true },
-  { id: "med_14", name: "Alendronate 70mg", genericName: "Alendronate Sodium", category: "Bone Health", brand: null, unit: "Tablet", reorderLevel: 10, stockQty: 0, sellPrice: 45, nearestExpiry: null, isActive: true },
-  { id: "med_15", name: "Thiocolchicoside 4mg", genericName: "Thiocolchicoside", category: "Muscle Relaxant", brand: null, unit: "Tablet", reorderLevel: 20, stockQty: 0, sellPrice: 10, nearestExpiry: null, isActive: true },
-  { id: "med_16", name: "Chlorzoxazone 250mg + Paracetamol 500mg", genericName: "Chlorzoxazone + Paracetamol", category: "Muscle Relaxant", brand: null, unit: "Tablet", reorderLevel: 20, stockQty: 0, sellPrice: 6, nearestExpiry: null, isActive: true },
-  { id: "med_17", name: "Pantoprazole 40mg", genericName: "Pantoprazole", category: "PPI", brand: null, unit: "Tablet", reorderLevel: 25, stockQty: 0, sellPrice: 5, nearestExpiry: null, isActive: true },
-  { id: "med_18", name: "Folic Acid 5mg", genericName: "Folic Acid", category: "Supplement", brand: null, unit: "Tablet", reorderLevel: 20, stockQty: 0, sellPrice: 2, nearestExpiry: null, isActive: true },
-  { id: "med_19", name: "Etanercept 25mg Injection", genericName: "Etanercept", category: "Biologic (DMARD)", brand: null, unit: "Injection", reorderLevel: 5, stockQty: 0, sellPrice: 3200, nearestExpiry: null, isActive: true },
-  { id: "med_20", name: "Tramadol 37.5mg + Paracetamol 325mg", genericName: "Tramadol + Paracetamol", category: "Analgesic", brand: null, unit: "Tablet", reorderLevel: 20, stockQty: 0, sellPrice: 9, nearestExpiry: null, isActive: true },
+  { id: "med_1", name: "Etoricoxib 90mg", genericName: "Etoricoxib", category: "NSAID", brand: null, unit: "Tablet", reorderLevel: 20, stockQty: 140, sellPrice: 12, nearestExpiry: daysFromNow(210), isActive: true },
+  { id: "med_2", name: "Diclofenac 50mg", genericName: "Diclofenac Sodium", category: "NSAID", brand: null, unit: "Tablet", reorderLevel: 20, stockQty: 160, sellPrice: 4, nearestExpiry: daysFromNow(300), isActive: true },
+  { id: "med_3", name: "Aceclofenac 100mg + Paracetamol 325mg", genericName: "Aceclofenac + Paracetamol", category: "NSAID", brand: null, unit: "Tablet", reorderLevel: 20, stockQty: 120, sellPrice: 8, nearestExpiry: daysFromNow(240), isActive: true },
+  { id: "med_4", name: "Methotrexate 7.5mg", genericName: "Methotrexate", category: "DMARD", brand: null, unit: "Tablet", reorderLevel: 10, stockQty: 60, sellPrice: 15, nearestExpiry: daysFromNow(180), isActive: true },
+  { id: "med_5", name: "Sulfasalazine 500mg", genericName: "Sulfasalazine", category: "DMARD", brand: null, unit: "Tablet", reorderLevel: 10, stockQty: 55, sellPrice: 9, nearestExpiry: null, isActive: true },
+  { id: "med_6", name: "Hydroxychloroquine 200mg", genericName: "Hydroxychloroquine Sulfate", category: "DMARD", brand: null, unit: "Tablet", reorderLevel: 10, stockQty: 48, sellPrice: 11, nearestExpiry: daysFromNow(330), isActive: true },
+  { id: "med_7", name: "Leflunomide 20mg", genericName: "Leflunomide", category: "DMARD", brand: null, unit: "Tablet", reorderLevel: 10, stockQty: 40, sellPrice: 22, nearestExpiry: daysFromNow(270), isActive: true },
+  { id: "med_8", name: "Prednisolone 5mg", genericName: "Prednisolone", category: "Steroid", brand: null, unit: "Tablet", reorderLevel: 15, stockQty: 90, sellPrice: 3, nearestExpiry: daysFromNow(150), isActive: true },
+  { id: "med_9", name: "Febuxostat 40mg", genericName: "Febuxostat", category: "Gout Management", brand: null, unit: "Tablet", reorderLevel: 15, stockQty: 100, sellPrice: 14, nearestExpiry: daysFromNow(360), isActive: true },
+  { id: "med_10", name: "Colchicine 0.5mg", genericName: "Colchicine", category: "Gout Management", brand: null, unit: "Tablet", reorderLevel: 15, stockQty: 75, sellPrice: 6, nearestExpiry: daysFromNow(21), isActive: true },
+  { id: "med_11", name: "Allopurinol 100mg", genericName: "Allopurinol", category: "Gout Management", brand: null, unit: "Tablet", reorderLevel: 15, stockQty: 80, sellPrice: 5, nearestExpiry: daysFromNow(420), isActive: true },
+  { id: "med_12", name: "Calcium 500mg + Vitamin D3 250IU", genericName: "Calcium Carbonate + Cholecalciferol", category: "Bone Health", brand: null, unit: "Tablet", reorderLevel: 25, stockQty: 180, sellPrice: 7, nearestExpiry: daysFromNow(300), isActive: true },
+  { id: "med_13", name: "Vitamin D3 60000IU", genericName: "Cholecalciferol", category: "Bone Health", brand: null, unit: "Sachet", reorderLevel: 20, stockQty: 90, sellPrice: 30, nearestExpiry: daysFromNow(240), isActive: true },
+  { id: "med_14", name: "Alendronate 70mg", genericName: "Alendronate Sodium", category: "Bone Health", brand: null, unit: "Tablet", reorderLevel: 10, stockQty: 45, sellPrice: 45, nearestExpiry: daysFromNow(380), isActive: true },
+  { id: "med_15", name: "Thiocolchicoside 4mg", genericName: "Thiocolchicoside", category: "Muscle Relaxant", brand: null, unit: "Tablet", reorderLevel: 20, stockQty: 12, sellPrice: 10, nearestExpiry: daysFromNow(190), isActive: true },
+  { id: "med_16", name: "Chlorzoxazone 250mg + Paracetamol 500mg", genericName: "Chlorzoxazone + Paracetamol", category: "Muscle Relaxant", brand: null, unit: "Tablet", reorderLevel: 20, stockQty: 130, sellPrice: 6, nearestExpiry: null, isActive: true },
+  { id: "med_17", name: "Pantoprazole 40mg", genericName: "Pantoprazole", category: "PPI", brand: null, unit: "Tablet", reorderLevel: 25, stockQty: 200, sellPrice: 5, nearestExpiry: daysFromNow(310), isActive: true },
+  { id: "med_18", name: "Folic Acid 5mg", genericName: "Folic Acid", category: "Supplement", brand: null, unit: "Tablet", reorderLevel: 20, stockQty: 150, sellPrice: 2, nearestExpiry: daysFromNow(350), isActive: true },
+  { id: "med_19", name: "Etanercept 25mg Injection", genericName: "Etanercept", category: "Biologic (DMARD)", brand: null, unit: "Injection", reorderLevel: 5, stockQty: 2, sellPrice: 3200, nearestExpiry: daysFromNow(120), isActive: true },
+  { id: "med_20", name: "Tramadol 37.5mg + Paracetamol 325mg", genericName: "Tramadol + Paracetamol", category: "Analgesic", brand: null, unit: "Tablet", reorderLevel: 20, stockQty: 110, sellPrice: 9, nearestExpiry: daysFromNow(220), isActive: true },
 ];
 
 // ---------------------------------------------------------------------------
-// Notifications / activities — clean slate; populated by real usage
+// Notifications / activities — a few sample entries so the bell, the
+// notifications page and the "recent activity" widget demo with content.
+// `recipientId` targets one user by their session linkId; omit for broadcast.
 // ---------------------------------------------------------------------------
-export const notifications: NotificationItem[] = [];
-export const activities: ActivityItem[] = [];
+export const notifications: NotificationItem[] = [
+  {
+    id: "ntf_seed_1",
+    type: "APPOINTMENT_REMINDER",
+    channel: "WHATSAPP",
+    title: "Appointment reminder",
+    body: "Reminder: your follow-up with Dr. Abhijeet Bhosikar is today at 11:00 AM at Dr. Bhosikar's Rheumatology Clinic, Ravet.",
+    status: "SENT",
+    createdAt: daysFromNow(-1, 18, 0),
+    read: false,
+    recipientId: "pat_seed_1",
+    actionUrl: "/portal/appointments",
+  },
+  {
+    id: "ntf_seed_2",
+    type: "FOLLOWUP_REMINDER",
+    channel: "IN_APP",
+    title: "Follow-up due",
+    body: "Ramesh Kulkarni (MRN-100235) is due for a gout follow-up and uric acid review this week.",
+    status: "SENT",
+    createdAt: daysFromNow(-2, 9, 30),
+    read: true,
+    recipientId: "doc_bhosikar",
+    actionUrl: "/doctor/patients",
+  },
+  {
+    id: "ntf_seed_3",
+    type: "INVENTORY_LOW_STOCK",
+    channel: "IN_APP",
+    title: "Low stock alert",
+    body: "Etanercept 25mg Injection is down to 2 units (reorder level 5). Raise a purchase order with the supplier.",
+    status: "SENT",
+    createdAt: daysFromNow(-1, 11, 15),
+    read: false,
+    actionUrl: "/admin/inventory",
+  },
+];
+
+export const activities: ActivityItem[] = [
+  {
+    id: "act_seed_1",
+    actor: "Priya Kale",
+    action: "registered",
+    target: "Anjali Joshi",
+    at: daysFromNow(-45, 9, 45),
+  },
+  {
+    id: "act_seed_2",
+    actor: "Dr. Abhijeet Bhosikar",
+    action: "issued a prescription for",
+    target: "Ramesh Kulkarni",
+    at: daysFromNow(-10, 16, 50),
+  },
+  {
+    id: "act_seed_3",
+    actor: "Priya Kale",
+    action: "collected payment for",
+    target: "Invoice INV-1002",
+    at: daysFromNow(-10, 16, 55),
+  },
+];
 
 // ---------------------------------------------------------------------------
 // Session users per role (demo login — hidden dev fallback only)

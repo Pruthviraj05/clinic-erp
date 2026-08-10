@@ -23,6 +23,7 @@ export async function applyStockChange(
   type: StockMovementType,
   reason: string,
   by: string,
+  extra?: { billPhotoDataUrl?: string },
 ): Promise<{ ok: boolean; message: string; balanceAfter?: number }> {
   const med = await findMedicine(medicineId);
   if (!med) return { ok: false, message: "Medicine not found." };
@@ -42,6 +43,7 @@ export async function applyStockChange(
     reason,
     by,
     at: now,
+    ...(extra?.billPhotoDataUrl ? { billPhotoDataUrl: extra.billPhotoDataUrl } : {}),
   });
   return { ok: true, message: "Stock updated.", balanceAfter };
 }
@@ -56,6 +58,8 @@ export async function addMedicine(input: {
   sellPrice: number;
   openingStock: number;
   by: string;
+  reason?: string;
+  billPhotoDataUrl?: string;
 }): Promise<Medicine> {
   const now = new Date().toISOString();
   const med: Medicine = {
@@ -82,9 +86,10 @@ export async function addMedicine(input: {
       type: "IN",
       quantity: input.openingStock,
       balanceAfter: input.openingStock,
-      reason: "Opening stock",
+      reason: input.reason || "Opening stock",
       by: input.by,
       at: now,
+      ...(input.billPhotoDataUrl ? { billPhotoDataUrl: input.billPhotoDataUrl } : {}),
     });
   }
   return med;

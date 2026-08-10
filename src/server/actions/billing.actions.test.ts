@@ -1,0 +1,140 @@
+import { describe, it, expect, vi, beforeAll } from "vitest";
+import type { Medicine, Patient } from "@/types/domain";
+
+/**
+ * Pharmacy billing must keep inventory honest: every dispensed unit leaves
+ * stock and leaves a SALE movement behind. These tests pin that behaviour —
+ * it is the one place where billing and inventory have to agree.
+ */
+const currentRole = { value: "RECEPTIONIST" };
+
+vi.mock("next/headers", () => ({
+  cookies: async () => ({
+    get: (name: string) => (name === "clinicore_role" ? { name, value: currentRole.value } : undefined),
+  }),
+}));
+vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
+
+const { createPharmacyBillAction } = await import("./billing.actions");
+const { db } = await import("@/server/repositories");
+
+const patient: Patient = {
+  id: "pat_bill_test",
+  mrn: "TST-B001",
+  firstName: "Bill",
+  lastName: "Tester",
+  fullName: "Bill Tester",
+  gender: "UNDISCLOSED",
+  dateOfBirth: null,
+  bloodGroup: "UNKNOWN",
+  phone: "+91 00000 30003",
+  email: null,
+  city: null,
+  allergies: null,
+  chronicDiseases: null,
+  createdAt: new Date().toISOString(),
+  lastVisitAt: null,
+  isActive: true,
+};
+
+function med(id: string, stockQty: number, sellPrice = 10): Medicine {
+  return {
+    id,
+    name: `Test Med ${id}`,
+    genericName: null,
+    category: "NSAID",
+    brand: null,
+    unit: "Tablet",
+    reorderLevel: 5,
+    stockQty,
+    sellPrice,
+    nearestExpiry: null,
+    isActive: true,
+  };
+}
+
+beforeAll(async () => {
+  await db.patients.insert(patient);
+  await db.medicines.insert(med("med_bill_a", 100, 20));
+  await db.medicines.insert(med("med_bill_b", 3, 50));
+  await db.medicines.insert(med("med_bill_c", 10, 15));
+});
+
+describe("createPharmacyBillAction", () => {
+  it("deducts dispensed stock and logs a SALE movement", async () => {
+    const res = await createPharmacyBillAction({
+      patientId: patient.id,
+      branchId: "br_ravet",
+      items: [{ medicineId: "med_bill_a", quantity: 12 }],
+    });
+
+    expect(res.ok).toBe(true);
+    expect((await db.medicines.get("med_bill_a"))!.stockQty).toBe(88);
+
+    const moves = await db.stockMovements.list((m) => m.medicineId === "med_bill_a");
+    const sale = moves.find((m) => m.type === "SALE")!;
+    expect(sale).toBeDefined();
+    expect(sale.quantity).toBe(-12); // signed: dispensing removes stock
+    expect(sale.balanceAfter).toBe(88);
+    expect(sale.reason).toContain(res.data!.number);
+  });
+
+  it("prices lines from the catalog and adds GST", async () => {
+    const res = await createPharmacyBillAction({
+      patientId: patient.id,
+      branchId: "br_ravet",
+      items: [{ medicineId: "med_bill_c", quantity: 2 }],
+    });
+    expect(res.ok).toBe(true);
+    const inv = res.data!;
+    expect(inv.items[0].unitPrice).toBe(15);
+    expect(inv.subtotal).toBe(30);
+    expect(inv.taxAmount).toBe(3.6); // 12% pharmacy GST
+    expect(inv.totalAmount).toBe(33.6);
+    expect(inv.balanceAmount).toBe(0);
+  });
+
+  it("refuses the whole bill when one line exceeds stock, leaving inventory untouched", async () => {
+    const before = (await db.medicines.get("med_bill_a"))!.stockQty;
+    const res = await createPharmacyBillAction({
+      patientId: patient.id,
+      branchId: "br_ravet",
+      items: [
+        { medicineId: "med_bill_a", quantity: 1 },
+        { medicineId: "med_bill_b", quantity: 99 }, // only 3 in stock
+      ],
+    });
+
+    expect(res.ok).toBe(false);
+    expect(res.message).toMatch(/insufficient stock/i);
+    // The good line must NOT have been dispensed.
+    expect((await db.medicines.get("med_bill_a"))!.stockQty).toBe(before);
+    expect((await db.medicines.get("med_bill_b"))!.stockQty).toBe(3);
+  });
+
+  it("sums repeats of the same medicine before checking stock", async () => {
+    // 2 + 2 = 4 against a stock of 3 — must fail, even though each line fits.
+    const res = await createPharmacyBillAction({
+      patientId: patient.id,
+      branchId: "br_ravet",
+      items: [
+        { medicineId: "med_bill_b", quantity: 2 },
+        { medicineId: "med_bill_b", quantity: 2 },
+      ],
+    });
+    expect(res.ok).toBe(false);
+    expect((await db.medicines.get("med_bill_b"))!.stockQty).toBe(3);
+  });
+
+  it("denies roles without billing rights", async () => {
+    currentRole.value = "PATIENT";
+    const res = await createPharmacyBillAction({
+      patientId: patient.id,
+      branchId: "br_ravet",
+      items: [{ medicineId: "med_bill_a", quantity: 1 }],
+    });
+    expect(res.ok).toBe(false);
+    expect(res.message).toMatch(/permission/i);
+    currentRole.value = "RECEPTIONIST";
+  });
+});

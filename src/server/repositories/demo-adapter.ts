@@ -2,6 +2,7 @@ import "server-only";
 import {
   appointments,
   branches,
+  daysFromNow,
   doctors,
   invoices,
   medicines,
@@ -76,7 +77,58 @@ const masters: Record<string, EntityStore<MasterRow>> = {
   "tax-rates": arrayStore(taxRates),
 };
 
-const stockMovementsRows: StockMovementItem[] = [];
+/**
+ * Sample stock ledger. Balances line up with the opening `stockQty` values in
+ * `src/server/demo/data.ts` (med_1 = 140 after a 150 receipt and a 10-unit
+ * sale, med_17 = 200, med_19 = 2) so the Movements tab reconciles with the
+ * stock list instead of looking empty.
+ */
+const stockMovementsRows: StockMovementItem[] = [
+  {
+    id: "stk_seed_1",
+    medicineId: "med_1",
+    medicineName: "Etoricoxib 90mg",
+    type: "IN",
+    quantity: 150,
+    balanceAfter: 150,
+    reason: "Opening stock — Sahyadri Pharma Distributors, invoice SPD-4471",
+    by: "Priya Kale",
+    at: daysFromNow(-30, 10, 15),
+  },
+  {
+    id: "stk_seed_2",
+    medicineId: "med_17",
+    medicineName: "Pantoprazole 40mg",
+    type: "IN",
+    quantity: 200,
+    balanceAfter: 200,
+    reason: "Opening stock — Deccan Medico Agencies, invoice DMA-1180",
+    by: "Priya Kale",
+    at: daysFromNow(-30, 10, 25),
+  },
+  {
+    id: "stk_seed_3",
+    medicineId: "med_19",
+    medicineName: "Etanercept 25mg Injection",
+    type: "IN",
+    quantity: 2,
+    balanceAfter: 2,
+    reason: "Cold-chain receipt — Nirmal Healthcare Supplies, invoice NHS-0092",
+    by: "Admin",
+    at: daysFromNow(-14, 11, 0),
+  },
+  {
+    id: "stk_seed_4",
+    medicineId: "med_1",
+    medicineName: "Etoricoxib 90mg",
+    type: "SALE",
+    quantity: -10,
+    balanceAfter: 140,
+    reason: "Dispensed — Ramesh Kulkarni (MRN-100235)",
+    by: "Priya Kale",
+    at: daysFromNow(-10, 17, 5),
+  },
+];
 const auditLogRows: AuditRow[] = [];
 const usersRows: UserAccount[] = [ADMIN_SEED_USER];
 const rxTemplatesRows: RxTemplate[] = [...SEED_RX_TEMPLATES];

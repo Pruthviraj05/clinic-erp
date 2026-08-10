@@ -5,7 +5,13 @@ import { authorize } from "@/lib/guard";
 import { addMedicine, applyStockChange, lowStockItems, updateMedicine } from "@/server/demo/inventory-store";
 import { db } from "@/server/repositories";
 import { logAudit } from "@/server/demo/extra";
-import { addMedicineSchema, adjustStockSchema, editMedicineSchema } from "@/features/inventory/schema";
+import {
+  addMedicineSchema,
+  adjustStockSchema,
+  editMedicineSchema,
+  importStockSchema,
+  type ImportStockInput,
+} from "@/features/inventory/schema";
 import type { ActionResult } from "./appointment.actions";
 import type { Medicine } from "@/types/domain";
 
@@ -43,9 +49,16 @@ export async function adjustStockAction(
   if (!parsed.success) {
     return { ok: false, message: "Please fix the highlighted fields.", fieldErrors: parsed.error.flatten().fieldErrors };
   }
-  const { medicineId, direction, quantity, reason } = parsed.data;
+  const { medicineId, direction, quantity, reason, billPhotoDataUrl } = parsed.data;
   const delta = direction === "IN" ? quantity : -quantity;
-  const res = await applyStockChange(medicineId, delta, direction === "IN" ? "IN" : "OUT", reason, session.user.fullName);
+  const res = await applyStockChange(
+    medicineId,
+    delta,
+    direction === "IN" ? "IN" : "OUT",
+    reason,
+    session.user.fullName,
+    { billPhotoDataUrl },
+  );
   if (!res.ok) return { ok: false, message: res.message };
   await logAudit({
     actor: session.user.fullName,
@@ -93,6 +106,89 @@ export async function updateMedicineAction(
   });
   revalidatePath("/admin/inventory");
   return { ok: true, message: `Updated ${med.name}.`, data: med };
+}
+
+export interface ImportStockSummary {
+  created: number;
+  toppedUp: number;
+  failed: { name: string; reason: string }[];
+}
+
+/**
+ * Bulk stock-in from a CSV/Excel upload (optionally with the supplier's bill
+ * photo attached to every movement it creates).
+ *
+ * Rows carrying a `medicineId` top up an existing medicine; rows without one
+ * create a new medicine using the row's quantity as opening stock. Each row is
+ * applied independently — one bad row is reported back rather than discarding
+ * the whole import, since a part-applied import is still visible in the
+ * movement log and can be corrected, whereas silently dropping 200 good rows
+ * because of one typo is worse.
+ */
+export async function importStockAction(
+  payload: ImportStockInput,
+): Promise<ActionResult<ImportStockSummary>> {
+  const authz = await authorize("inventory", "create");
+  if (!authz.ok) return authz;
+  const { session } = authz;
+
+  const parsed = importStockSchema.safeParse(payload);
+  if (!parsed.success) {
+    const first = parsed.error.issues[0];
+    return { ok: false, message: first?.message ?? "The import could not be validated." };
+  }
+  const { rows, reference, billPhotoDataUrl } = parsed.data;
+  const by = session.user.fullName;
+  const reason = reference?.trim() ? `Stock in — ${reference.trim()}` : "Stock in — bulk import";
+
+  const summary: ImportStockSummary = { created: 0, toppedUp: 0, failed: [] };
+
+  for (const row of rows) {
+    try {
+      if (row.medicineId) {
+        const res = await applyStockChange(row.medicineId, row.quantity, "IN", reason, by, { billPhotoDataUrl });
+        if (res.ok) summary.toppedUp += 1;
+        else summary.failed.push({ name: row.name, reason: res.message });
+        continue;
+      }
+      await addMedicine({
+        name: row.name,
+        genericName: row.genericName,
+        category: row.category,
+        brand: row.brand,
+        unit: row.unit || "Unit",
+        reorderLevel: row.reorderLevel ?? 0,
+        sellPrice: row.sellPrice ?? 0,
+        openingStock: row.quantity,
+        by,
+        reason,
+        billPhotoDataUrl,
+      });
+      summary.created += 1;
+    } catch {
+      summary.failed.push({ name: row.name, reason: "Could not be saved." });
+    }
+  }
+
+  if (summary.created === 0 && summary.toppedUp === 0) {
+    return { ok: false, message: "Nothing was imported. Check the highlighted rows and try again.", data: summary };
+  }
+
+  await logAudit({
+    actor: by,
+    role: session.user.role,
+    action: "CREATE",
+    entity: "Medicine",
+    summary: `Stock import — ${summary.created} new, ${summary.toppedUp} topped up${summary.failed.length ? `, ${summary.failed.length} failed` : ""}${reference ? ` (${reference})` : ""}`,
+  });
+
+  revalidatePath("/admin/inventory");
+  const parts = [
+    summary.created ? `${summary.created} new medicine(s)` : null,
+    summary.toppedUp ? `${summary.toppedUp} restocked` : null,
+    summary.failed.length ? `${summary.failed.length} failed` : null,
+  ].filter(Boolean);
+  return { ok: true, message: `Import complete — ${parts.join(", ")}.`, data: summary };
 }
 
 /** Soft activate/deactivate a medicine. Deactivation requires delete rights. */

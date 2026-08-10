@@ -21,8 +21,12 @@ import type { Medicine } from "@/types/domain";
 const fieldClass =
   "h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
+const MAX_BILL_BYTES = 5 * 1024 * 1024;
+
 export function AdjustStockDialog({ medicine }: { medicine: Medicine }) {
   const [open, setOpen] = useState(false);
+  const [billPhoto, setBillPhoto] = useState<string>("");
+  const [billName, setBillName] = useState("");
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(adjustStockAction, null);
 
   useEffect(() => {
@@ -30,8 +34,28 @@ export function AdjustStockDialog({ medicine }: { medicine: Medicine }) {
     if (state.ok) {
       toast.success(state.message ?? "Stock updated.");
       setOpen(false);
+      setBillPhoto("");
+      setBillName("");
     } else if (state.message) toast.error(state.message);
   }, [state]);
+
+  function onBillChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setBillPhoto("");
+      setBillName("");
+      return;
+    }
+    if (file.size > MAX_BILL_BYTES) {
+      toast.error("Bill photo is too large (max 5 MB).");
+      e.target.value = "";
+      return;
+    }
+    setBillName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => setBillPhoto(String(reader.result));
+    reader.readAsDataURL(file);
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -63,6 +87,12 @@ export function AdjustStockDialog({ medicine }: { medicine: Medicine }) {
           <div className="grid gap-2">
             <Label htmlFor="reason">Reason</Label>
             <input id="reason" name="reason" className={fieldClass} placeholder="e.g. Purchase, damage, correction" />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="billPhoto">Supplier bill photo (optional, max 5 MB)</Label>
+            <input id="billPhoto" type="file" accept="image/*,.pdf" onChange={onBillChange} className="text-sm" />
+            {billName && <p className="text-xs text-muted-foreground">Attached: {billName}</p>}
+            <input type="hidden" name="billPhotoDataUrl" value={billPhoto} />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

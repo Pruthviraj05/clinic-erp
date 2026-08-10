@@ -6,9 +6,9 @@ import { db } from "@/server/repositories";
 describe("inventory store", () => {
   it("deducts stock, stamps the user, and logs a movement", async () => {
     const med = medicines[0];
-    // The rheumatology formulary starts at stockQty: 0 (clean slate), so
-    // bring some stock in first before exercising a deduction.
-    await applyStockChange(med.id, 50, "IN", "Opening balance — TEST", "Admin");
+    // Top up first so the deduction below never depends on the seed's
+    // opening stock level (derive expectations from the data, not constants).
+    await applyStockChange(med.id, 50, "IN", "Stock receipt — TEST", "Admin");
     const before = (await findMedicine(med.id))!.stockQty;
     const movesBefore = (await db.stockMovements.list()).length;
 

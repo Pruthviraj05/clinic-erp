@@ -369,30 +369,35 @@ async function main() {
   console.log("Seeded: patients, appointments, prescriptions, invoices (3 sample patients)");
 
   // -------------------------------------------------------------------
-  // Medicines — rheumatology formulary (20 items, stock starts at 0)
+  // Medicines — rheumatology formulary (20 items) with sample opening
+  // stock. Two items sit at/below reorder level (med_15, med_19) so the
+  // low-stock alert demos, and med_10 expires inside 30 days so the
+  // "Expiring ≤30 days" card is non-zero. Mirrors demo/data.ts.
+  // Tuple: [id, name, generic, category, unit, reorderLevel, sellPrice,
+  //         stockQty, expiryInDays | null]
   // -------------------------------------------------------------------
   const medicines = [
-    ["med_1", "Etoricoxib 90mg", "Etoricoxib", "NSAID", "Tablet", 20, 12],
-    ["med_2", "Diclofenac 50mg", "Diclofenac Sodium", "NSAID", "Tablet", 20, 4],
-    ["med_3", "Aceclofenac 100mg + Paracetamol 325mg", "Aceclofenac + Paracetamol", "NSAID", "Tablet", 20, 8],
-    ["med_4", "Methotrexate 7.5mg", "Methotrexate", "DMARD", "Tablet", 10, 15],
-    ["med_5", "Sulfasalazine 500mg", "Sulfasalazine", "DMARD", "Tablet", 10, 9],
-    ["med_6", "Hydroxychloroquine 200mg", "Hydroxychloroquine Sulfate", "DMARD", "Tablet", 10, 11],
-    ["med_7", "Leflunomide 20mg", "Leflunomide", "DMARD", "Tablet", 10, 22],
-    ["med_8", "Prednisolone 5mg", "Prednisolone", "Steroid", "Tablet", 15, 3],
-    ["med_9", "Febuxostat 40mg", "Febuxostat", "Gout Management", "Tablet", 15, 14],
-    ["med_10", "Colchicine 0.5mg", "Colchicine", "Gout Management", "Tablet", 15, 6],
-    ["med_11", "Allopurinol 100mg", "Allopurinol", "Gout Management", "Tablet", 15, 5],
-    ["med_12", "Calcium 500mg + Vitamin D3 250IU", "Calcium Carbonate + Cholecalciferol", "Bone Health", "Tablet", 25, 7],
-    ["med_13", "Vitamin D3 60000IU", "Cholecalciferol", "Bone Health", "Sachet", 20, 30],
-    ["med_14", "Alendronate 70mg", "Alendronate Sodium", "Bone Health", "Tablet", 10, 45],
-    ["med_15", "Thiocolchicoside 4mg", "Thiocolchicoside", "Muscle Relaxant", "Tablet", 20, 10],
-    ["med_16", "Chlorzoxazone 250mg + Paracetamol 500mg", "Chlorzoxazone + Paracetamol", "Muscle Relaxant", "Tablet", 20, 6],
-    ["med_17", "Pantoprazole 40mg", "Pantoprazole", "PPI", "Tablet", 25, 5],
-    ["med_18", "Folic Acid 5mg", "Folic Acid", "Supplement", "Tablet", 20, 2],
-    ["med_19", "Etanercept 25mg Injection", "Etanercept", "Biologic (DMARD)", "Injection", 5, 3200],
-    ["med_20", "Tramadol 37.5mg + Paracetamol 325mg", "Tramadol + Paracetamol", "Analgesic", "Tablet", 20, 9],
-  ].map(([id, name, genericName, category, unit, reorderLevel, sellPrice]) => ({
+    ["med_1", "Etoricoxib 90mg", "Etoricoxib", "NSAID", "Tablet", 20, 12, 140, 210],
+    ["med_2", "Diclofenac 50mg", "Diclofenac Sodium", "NSAID", "Tablet", 20, 4, 160, 300],
+    ["med_3", "Aceclofenac 100mg + Paracetamol 325mg", "Aceclofenac + Paracetamol", "NSAID", "Tablet", 20, 8, 120, 240],
+    ["med_4", "Methotrexate 7.5mg", "Methotrexate", "DMARD", "Tablet", 10, 15, 60, 180],
+    ["med_5", "Sulfasalazine 500mg", "Sulfasalazine", "DMARD", "Tablet", 10, 9, 55, null],
+    ["med_6", "Hydroxychloroquine 200mg", "Hydroxychloroquine Sulfate", "DMARD", "Tablet", 10, 11, 48, 330],
+    ["med_7", "Leflunomide 20mg", "Leflunomide", "DMARD", "Tablet", 10, 22, 40, 270],
+    ["med_8", "Prednisolone 5mg", "Prednisolone", "Steroid", "Tablet", 15, 3, 90, 150],
+    ["med_9", "Febuxostat 40mg", "Febuxostat", "Gout Management", "Tablet", 15, 14, 100, 360],
+    ["med_10", "Colchicine 0.5mg", "Colchicine", "Gout Management", "Tablet", 15, 6, 75, 21],
+    ["med_11", "Allopurinol 100mg", "Allopurinol", "Gout Management", "Tablet", 15, 5, 80, 420],
+    ["med_12", "Calcium 500mg + Vitamin D3 250IU", "Calcium Carbonate + Cholecalciferol", "Bone Health", "Tablet", 25, 7, 180, 300],
+    ["med_13", "Vitamin D3 60000IU", "Cholecalciferol", "Bone Health", "Sachet", 20, 30, 90, 240],
+    ["med_14", "Alendronate 70mg", "Alendronate Sodium", "Bone Health", "Tablet", 10, 45, 45, 380],
+    ["med_15", "Thiocolchicoside 4mg", "Thiocolchicoside", "Muscle Relaxant", "Tablet", 20, 10, 12, 190],
+    ["med_16", "Chlorzoxazone 250mg + Paracetamol 500mg", "Chlorzoxazone + Paracetamol", "Muscle Relaxant", "Tablet", 20, 6, 130, null],
+    ["med_17", "Pantoprazole 40mg", "Pantoprazole", "PPI", "Tablet", 25, 5, 200, 310],
+    ["med_18", "Folic Acid 5mg", "Folic Acid", "Supplement", "Tablet", 20, 2, 150, 350],
+    ["med_19", "Etanercept 25mg Injection", "Etanercept", "Biologic (DMARD)", "Injection", 5, 3200, 2, 120],
+    ["med_20", "Tramadol 37.5mg + Paracetamol 325mg", "Tramadol + Paracetamol", "Analgesic", "Tablet", 20, 9, 110, 220],
+  ].map(([id, name, genericName, category, unit, reorderLevel, sellPrice, stockQty, expiryInDays]) => ({
     id,
     name,
     genericName,
@@ -400,13 +405,241 @@ async function main() {
     brand: null,
     unit,
     reorderLevel,
-    stockQty: 0,
+    stockQty,
     sellPrice,
-    nearestExpiry: null,
+    nearestExpiry: expiryInDays === null ? null : daysFromNow(expiryInDays),
     isActive: true,
   }));
   await upsertMany(db.collection("medicines"), medicines);
-  console.log(`Seeded: medicines (${medicines.length} items)`);
+  console.log(`Seeded: medicines (${medicines.length} items, sample opening stock)`);
+
+  // -------------------------------------------------------------------
+  // Stock movements — sample ledger reconciling with the opening stock
+  // above (med_1 = 150 in − 10 sold = 140, med_17 = 200, med_19 = 2).
+  // -------------------------------------------------------------------
+  const stockMovements = [
+    {
+      id: "stk_seed_1",
+      medicineId: "med_1",
+      medicineName: "Etoricoxib 90mg",
+      type: "IN",
+      quantity: 150,
+      balanceAfter: 150,
+      reason: "Opening stock — Sahyadri Pharma Distributors, invoice SPD-4471",
+      by: "Priya Kale",
+      at: daysFromNow(-30, 10, 15),
+    },
+    {
+      id: "stk_seed_2",
+      medicineId: "med_17",
+      medicineName: "Pantoprazole 40mg",
+      type: "IN",
+      quantity: 200,
+      balanceAfter: 200,
+      reason: "Opening stock — Deccan Medico Agencies, invoice DMA-1180",
+      by: "Priya Kale",
+      at: daysFromNow(-30, 10, 25),
+    },
+    {
+      id: "stk_seed_3",
+      medicineId: "med_19",
+      medicineName: "Etanercept 25mg Injection",
+      type: "IN",
+      quantity: 2,
+      balanceAfter: 2,
+      reason: "Cold-chain receipt — Nirmal Healthcare Supplies, invoice NHS-0092",
+      by: "Admin",
+      at: daysFromNow(-14, 11, 0),
+    },
+    {
+      id: "stk_seed_4",
+      medicineId: "med_1",
+      medicineName: "Etoricoxib 90mg",
+      type: "SALE",
+      quantity: -10,
+      balanceAfter: 140,
+      reason: "Dispensed — Ramesh Kulkarni (MRN-100235)",
+      by: "Priya Kale",
+      at: daysFromNow(-10, 17, 5),
+    },
+  ];
+  await upsertMany(db.collection("stock_movements"), stockMovements);
+  console.log(`Seeded: stock_movements (${stockMovements.length} rows)`);
+
+  // -------------------------------------------------------------------
+  // Reception staff
+  // -------------------------------------------------------------------
+  const receptionists = [
+    {
+      id: "rec_seed_1",
+      userId: "usr_rec_seed_1",
+      fullName: "Priya Kale",
+      email: "priya.kale@gmail.com",
+      branchId: "br_ravet",
+      employeeCode: "EMP-001",
+      isActive: true,
+    },
+    {
+      id: "rec_seed_2",
+      userId: "usr_rec_seed_2",
+      fullName: "Sneha Patil",
+      email: "sneha.patil@gmail.com",
+      branchId: "br_ravet",
+      employeeCode: "EMP-002",
+      isActive: true,
+    },
+  ];
+  await upsertMany(db.collection("receptionists"), receptionists);
+  console.log(`Seeded: receptionists (${receptionists.length} staff)`);
+
+  // -------------------------------------------------------------------
+  // Notifications — recipientId targets one user by session linkId;
+  // omitting it broadcasts to everyone.
+  // -------------------------------------------------------------------
+  const notifications = [
+    {
+      id: "ntf_seed_1",
+      type: "APPOINTMENT_REMINDER",
+      channel: "WHATSAPP",
+      title: "Appointment reminder",
+      body: "Reminder: your follow-up with Dr. Abhijeet Bhosikar is today at 11:00 AM at Dr. Bhosikar's Rheumatology Clinic, Ravet.",
+      status: "SENT",
+      createdAt: daysFromNow(-1, 18, 0),
+      read: false,
+      recipientId: "pat_seed_1",
+      actionUrl: "/portal/appointments",
+    },
+    {
+      id: "ntf_seed_2",
+      type: "FOLLOWUP_REMINDER",
+      channel: "IN_APP",
+      title: "Follow-up due",
+      body: "Ramesh Kulkarni (MRN-100235) is due for a gout follow-up and uric acid review this week.",
+      status: "SENT",
+      createdAt: daysFromNow(-2, 9, 30),
+      read: true,
+      recipientId: "doc_bhosikar",
+      actionUrl: "/doctor/patients",
+    },
+    {
+      id: "ntf_seed_3",
+      type: "INVENTORY_LOW_STOCK",
+      channel: "IN_APP",
+      title: "Low stock alert",
+      body: "Etanercept 25mg Injection is down to 2 units (reorder level 5). Raise a purchase order with the supplier.",
+      status: "SENT",
+      createdAt: daysFromNow(-1, 11, 15),
+      read: false,
+      actionUrl: "/admin/inventory",
+    },
+  ];
+  await upsertMany(db.collection("notifications"), notifications);
+  console.log(`Seeded: notifications (${notifications.length} items)`);
+
+  // -------------------------------------------------------------------
+  // Medical records (EMR) — metadata only, no attached files
+  // -------------------------------------------------------------------
+  const medicalRecords = [
+    {
+      id: "mr_seed_1",
+      patientId: "pat_seed_1",
+      title: "RA Factor & Anti-CCP Report",
+      category: "Lab Report",
+      fileType: "PDF",
+      fileSize: "412 KB",
+      recordedAt: daysFromNow(-32, 9, 30),
+      notes: "RA Factor 78 IU/mL (high), Anti-CCP positive. Supports the rheumatoid arthritis diagnosis; ESR and CRP also raised.",
+      addedBy: "Dr. Abhijeet Bhosikar (Doctor)",
+    },
+    {
+      id: "mr_seed_2",
+      patientId: "pat_seed_2",
+      title: "Serum Uric Acid Report",
+      category: "Lab Report",
+      fileType: "PDF",
+      fileSize: "188 KB",
+      recordedAt: daysFromNow(-11, 8, 45),
+      notes: "Serum uric acid 8.9 mg/dL during the acute attack. Renal function within normal limits. Repeat after the flare settles.",
+      addedBy: "Ramesh Kulkarni (Patient)",
+    },
+    {
+      id: "mr_seed_3",
+      patientId: "pat_seed_3",
+      title: "X-Ray LS Spine (AP & Lateral)",
+      category: "Radiology",
+      fileType: "JPG",
+      fileSize: "1.4 MB",
+      recordedAt: daysFromNow(-44, 12, 0),
+      notes: "Mild reduction of L4-L5 disc space. No listhesis or fracture. Consistent with mechanical low back pain.",
+      addedBy: "Dr. Abhijeet Bhosikar (Doctor)",
+    },
+  ];
+  await upsertMany(db.collection("medical_records"), medicalRecords);
+  console.log(`Seeded: medical_records (${medicalRecords.length} records)`);
+
+  // -------------------------------------------------------------------
+  // Consent forms (e-signature) — 2 pending, 1 signed
+  // -------------------------------------------------------------------
+  const consentForms = [
+    {
+      id: "cf_seed_1",
+      patientId: "pat_seed_1",
+      patientName: "Sunita Deshmukh",
+      doctorId: "doc_bhosikar",
+      doctorName: DOCTOR_NAME,
+      title: "Consent for DMARD Therapy (Methotrexate)",
+      body:
+        "I consent to starting disease-modifying therapy with Methotrexate for rheumatoid arthritis. " +
+        "The doctor has explained the expected benefit, the weekly (not daily) dosing schedule, and the need " +
+        "for Folic Acid supplementation. I understand possible side effects include nausea, mouth ulcers, hair " +
+        "thinning, and effects on the liver and blood counts, and that regular CBC and liver function monitoring " +
+        "is required. I have been advised to avoid alcohol and to inform the clinic immediately if I develop " +
+        "fever, unusual bleeding, breathlessness or persistent cough. I understand this medicine must not be " +
+        "taken during pregnancy.",
+      details: "Starting dose 7.5 mg once weekly. Baseline CBC, LFT, ESR and CRP done. Monitoring bloods every 4 weeks for the first 3 months.",
+      status: "PENDING",
+      createdBy: "Priya Kale",
+      updatedAt: daysFromNow(-3, 12, 15),
+    },
+    {
+      id: "cf_seed_2",
+      patientId: "pat_seed_2",
+      patientName: "Ramesh Kulkarni",
+      doctorId: "doc_bhosikar",
+      doctorName: DOCTOR_NAME,
+      title: "Consent for Intra-articular Steroid Injection",
+      body:
+        "I consent to an intra-articular corticosteroid injection into the affected joint for relief of acute " +
+        "inflammatory pain. The procedure, its purpose and alternatives have been explained to me. I understand " +
+        "the possible risks include a temporary flare of pain for 24–48 hours, skin thinning or lightening at the " +
+        "injection site, a short-term rise in blood sugar, and a small risk of joint infection. I confirm I have " +
+        "no active infection and have disclosed all my current medications and allergies.",
+      details: "Right first metatarsophalangeal joint. No anticoagulants. No known drug allergies. Procedure performed under aseptic precautions.",
+      status: "SIGNED",
+      signedAt: daysFromNow(-10, 16, 40),
+      createdBy: "Priya Kale",
+      updatedAt: daysFromNow(-10, 16, 40),
+    },
+    {
+      id: "cf_seed_3",
+      patientId: "pat_seed_3",
+      patientName: "Anjali Joshi",
+      doctorId: "doc_bhosikar",
+      doctorName: DOCTOR_NAME,
+      title: "Consent for Radiological Investigation (X-Ray LS Spine)",
+      body:
+        "I consent to an X-ray of the lumbosacral spine as advised for the evaluation of my low back pain. " +
+        "The reason for the test has been explained to me, along with the fact that it involves a small dose of " +
+        "ionising radiation. I confirm that I am not pregnant and am not likely to be pregnant. I understand the " +
+        "report will be shared with my treating doctor and stored in my clinic record.",
+      details: "AP and lateral views. Patient reports sulfa drug allergy — no contrast involved in this study.",
+      status: "PENDING",
+      createdBy: "Priya Kale",
+      updatedAt: daysFromNow(-2, 10, 30),
+    },
+  ];
+  await upsertMany(db.collection("consent_forms"), consentForms);
+  console.log(`Seeded: consent_forms (${consentForms.length} forms)`);
 
   // -------------------------------------------------------------------
   // Rx templates — rheumatology quick-start bundles (clinic-wide)
@@ -531,12 +764,17 @@ async function main() {
     { id: "iv_3", name: "MRI (Spine/Joint)", active: true },
     { id: "iv_4", name: "Bone Densitometry (DEXA Scan)", active: true },
   ]);
+  await upsertMasters(mastersCol, "suppliers", [
+    { id: "sup_1", name: "Sahyadri Pharma Distributors", meta: "Pimpri, Pune · +91 20 2745 8890 · GSTIN 27AABCS1429P1Z6", active: true },
+    { id: "sup_2", name: "Deccan Medico Agencies", meta: "Shivajinagar, Pune · +91 20 2553 1177 · GSTIN 27AACCD8812K1ZR", active: true },
+    { id: "sup_3", name: "Nirmal Healthcare Supplies", meta: "Chinchwad, Pune · +91 98220 34567 · GSTIN 27AAECN5590M1ZQ", active: true },
+  ]);
   await upsertMasters(mastersCol, "tax-rates", [
     { id: "tx_1", name: "GST 5%", meta: "5.00%", active: true },
     { id: "tx_2", name: "GST 12%", meta: "12.00%", active: true },
     { id: "tx_3", name: "GST 18%", meta: "18.00%", active: true },
   ]);
-  console.log("Seeded: masters (departments, specializations, medicine-categories, lab-tests, investigations, tax-rates)");
+  console.log("Seeded: masters (departments, specializations, medicine-categories, lab-tests, investigations, suppliers, tax-rates)");
 
   await client.close();
   console.log("\nDone. admin@gmail.com / Test@12345 can now sign in against MongoDB.");

@@ -194,6 +194,8 @@ export interface StockMovementItem {
   reason: string;
   by: string;
   at: string;
+  /** Supplier bill/invoice photo for a stock-in, as a base64 data URL. */
+  billPhotoDataUrl?: string;
 }
 
 export interface NotificationItem {
