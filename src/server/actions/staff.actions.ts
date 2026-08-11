@@ -1,10 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { randomBytes } from "node:crypto";
 import { newId } from "@/lib/ids";
 import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
+import { getCachedBranch } from "@/server/cache/reference-data";
 import { logAudit } from "@/server/demo/extra";
 import { hashPassword } from "@/server/demo/users-store";
 import { branchSchema, doctorSchema, receptionistSchema } from "@/features/staff/schema";
@@ -82,8 +83,9 @@ const BRANCH_PATHS = ["/admin/branches", "/admin/doctors", "/admin/receptionists
 const DOCTOR_PATHS = ["/admin/doctors", "/admin/branches"];
 const RECEPTIONIST_PATHS = ["/admin/receptionists", "/admin/branches"];
 
-function revalidate(paths: string[]) {
+function revalidate(paths: string[], tag?: "branches" | "doctors" | "receptionists") {
   for (const p of paths) revalidatePath(p);
+  if (tag) revalidateTag(tag);
 }
 
 /* ------------------------------- Branches ------------------------------- */
@@ -120,7 +122,7 @@ export async function createBranchAction(
     entity: "Branch",
     summary: `Created branch ${branch.name} (${branch.code})`,
   });
-  revalidate(BRANCH_PATHS);
+  revalidate(BRANCH_PATHS, "branches");
   return { ok: true, message: `Branch ${branch.name} created.`, data: branch };
 }
 
@@ -155,7 +157,7 @@ export async function updateBranchAction(
     entity: "Branch",
     summary: `Updated branch ${updated.name} (${updated.code})`,
   });
-  revalidate(BRANCH_PATHS);
+  revalidate(BRANCH_PATHS, "branches");
   return { ok: true, message: `Branch ${updated.name} updated.`, data: updated };
 }
 
@@ -173,7 +175,7 @@ export async function setBranchActiveAction(id: string, active: boolean): Promis
     entity: "Branch",
     summary: `${active ? "Reactivated" : "Deactivated"} branch ${updated.name}`,
   });
-  revalidate(BRANCH_PATHS);
+  revalidate(BRANCH_PATHS, "branches");
   return { ok: true, message: `Branch ${active ? "reactivated" : "deactivated"}.` };
 }
 
@@ -219,7 +221,7 @@ export async function createDoctorAction(
     entity: "Doctor",
     summary: `Added doctor ${doctor.fullName}`,
   });
-  revalidate(DOCTOR_PATHS);
+  revalidate(DOCTOR_PATHS, "doctors");
   return {
     ok: true,
     message: tempPassword
@@ -268,7 +270,7 @@ export async function updateDoctorAction(
     entity: "Doctor",
     summary: `Updated doctor ${updated.fullName}`,
   });
-  revalidate(DOCTOR_PATHS);
+  revalidate(DOCTOR_PATHS, "doctors");
   return { ok: true, message: `Doctor ${updated.fullName} updated.`, data: updated };
 }
 
@@ -289,7 +291,7 @@ export async function setDoctorActiveAction(id: string, active: boolean): Promis
     entity: "Doctor",
     summary: `${active ? "Reactivated" : "Deactivated"} doctor ${updated.fullName}`,
   });
-  revalidate(DOCTOR_PATHS);
+  revalidate(DOCTOR_PATHS, "doctors");
   return { ok: true, message: `Doctor ${active ? "reactivated" : "deactivated"}.` };
 }
 
@@ -308,7 +310,7 @@ export async function createReceptionistAction(
   }
   const input = parsed.data;
 
-  const branch = await db.branches.get(input.branchId);
+  const branch = await getCachedBranch(input.branchId);
   if (!branch) return { ok: false, message: "Invalid branch." };
 
   const id = newId("rec");
@@ -361,7 +363,7 @@ export async function updateReceptionistAction(
   }
   const input = parsed.data;
 
-  const branch = await db.branches.get(input.branchId);
+  const branch = await getCachedBranch(input.branchId);
   if (!branch) return { ok: false, message: "Invalid branch." };
 
   const updated = await db.receptionists.update(id, {

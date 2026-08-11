@@ -3,6 +3,7 @@ import { AppShellClient } from "./app-shell-client";
 import { DemoBanner } from "./demo-banner";
 import type { SessionUser } from "@/lib/session";
 import { db } from "@/server/repositories";
+import { getCachedBranch } from "@/server/cache/reference-data";
 
 /**
  * Authenticated application shell (server). Resolves per-user context and the
@@ -16,7 +17,7 @@ export async function AppShell({
   children: React.ReactNode;
 }) {
   const branchName = user.branchId
-    ? (await db.branches.get(user.branchId))?.name
+    ? (await getCachedBranch(user.branchId))?.name
     : undefined;
   // Counted, not fetched: this runs on EVERY authenticated page render, so
   // pulling the whole notifications collection here slowed the entire app.

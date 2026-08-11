@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireRole } from "@/lib/guard";
 import { db } from "@/server/repositories";
+import { getCachedBranches, getCachedDoctors } from "@/server/cache/reference-data";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReportsView } from "@/features/reports/reports-view";
 
@@ -9,8 +10,8 @@ export const metadata: Metadata = { title: "Reports" };
 export default async function AdminReportsPage() {
   await requireRole("ADMIN");
   const [branches, doctors, invoices, appointments, patients, stockMovements] = await Promise.all([
-    db.branches.list(),
-    db.doctors.list(),
+    getCachedBranches(),
+    getCachedDoctors(),
     db.invoices.list(),
     db.appointments.list(),
     db.patients.list(),

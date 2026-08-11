@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requireRole } from "@/lib/guard";
-import { db } from "@/server/repositories";
+import { getCachedBranches } from "@/server/cache/reference-data";
 import { getRxDesignFor, RX_ACCENTS } from "@/server/demo/rx-design-store";
 import { PageHeader } from "@/components/shared/page-header";
 import { RxDesignForm } from "@/features/prescriptions/rx-design-form";
@@ -19,7 +19,7 @@ export default async function DoctorRxDesignPage({
 
   const [design, allBranches] = await Promise.all([
     getRxDesignFor(user.linkId ?? user.id, branchId),
-    user.branchIds.length > 1 ? db.branches.list() : Promise.resolve([]),
+    user.branchIds.length > 1 ? getCachedBranches() : Promise.resolve([]),
   ]);
   const branches = allBranches.filter((b) => user.branchIds.includes(b.id));
 

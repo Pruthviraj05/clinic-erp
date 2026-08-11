@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requirePermission } from "@/lib/guard";
 import { db } from "@/server/repositories";
+import { getCachedDoctors } from "@/server/cache/reference-data";
 import { can } from "@/lib/rbac";
 import { PageHeader } from "@/components/shared/page-header";
 import { ConsentView } from "@/features/consent/consent-view";
@@ -13,7 +14,7 @@ export default async function ReceptionConsentPage() {
   const { user } = await requirePermission("consent", "view");
 
   const [doctors, patients, consentForms] = await Promise.all([
-    db.doctors.list(),
+    getCachedDoctors(),
     db.patients.list(),
     db.consentForms.list(),
   ]);

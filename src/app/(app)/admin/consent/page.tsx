@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireRole } from "@/lib/guard";
 import { db } from "@/server/repositories";
+import { getCachedDoctors } from "@/server/cache/reference-data";
 import { can } from "@/lib/rbac";
 import { PageHeader } from "@/components/shared/page-header";
 import { ConsentView } from "@/features/consent/consent-view";
@@ -10,7 +11,7 @@ export const metadata: Metadata = { title: "Consent Forms" };
 
 export default async function AdminConsentPage() {
   const { user } = await requireRole("ADMIN");
-  const [doctors, patients, consentForms] = await Promise.all([db.doctors.list(), db.patients.list(), db.consentForms.list()]);
+  const [doctors, patients, consentForms] = await Promise.all([getCachedDoctors(), db.patients.list(), db.consentForms.list()]);
   const doctorOptions = doctors
     .filter((d) => d.isActive)
     .map((d) => ({ id: d.id, label: d.fullName, sublabel: d.specialization ?? undefined }));

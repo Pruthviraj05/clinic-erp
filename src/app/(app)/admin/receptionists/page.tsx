@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireRole } from "@/lib/guard";
 import { can } from "@/lib/rbac";
 import { db } from "@/server/repositories";
+import { getCachedBranches } from "@/server/cache/reference-data";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReceptionistsView } from "@/features/staff/receptionists-view";
 
@@ -12,7 +13,7 @@ export default async function AdminReceptionistsPage() {
   const role = session.user.role;
 
   const [branches, receptionists] = await Promise.all([
-    db.branches.list(),
+    getCachedBranches(),
     db.receptionists.list(),
   ]);
   const branchNames = Object.fromEntries(branches.map((b) => [b.id, b.name]));

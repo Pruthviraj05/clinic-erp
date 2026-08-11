@@ -7,6 +7,7 @@ import { CONSENT_CATEGORIES } from "@/lib/consent-categories";
 import { z } from "zod";
 import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
+import { getCachedDoctor } from "@/server/cache/reference-data";
 import { logAudit } from "@/server/demo/extra";
 import type { ActionResult } from "./appointment.actions";
 import type { ConsentFormItem } from "@/server/demo/extra";
@@ -86,7 +87,7 @@ export async function createConsentAction(
     return { ok: false, message: "You can only create consent forms for yourself." };
   }
 
-  const [patient, doctor] = await Promise.all([db.patients.get(input.patientId), db.doctors.get(input.doctorId)]);
+  const [patient, doctor] = await Promise.all([db.patients.get(input.patientId), getCachedDoctor(input.doctorId)]);
   if (!patient || !doctor) return { ok: false, message: "Invalid patient or doctor." };
 
   const id = newId("cf");
@@ -167,7 +168,7 @@ export async function updateConsentAction(
   if (user.role === "DOCTOR" && form.doctorId !== user.linkId) {
     return { ok: false, message: "You can only edit consent forms assigned to you." };
   }
-  const doctor = await db.doctors.get(input.doctorId);
+  const doctor = await getCachedDoctor(input.doctorId);
   if (!doctor) return { ok: false, message: "Invalid doctor." };
 
   // Rows created before form numbers existed have none — backfill on first edit

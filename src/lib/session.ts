@@ -5,6 +5,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Role } from "./rbac";
 import { getDemoUserByRole, DEMO_ORG_ID } from "@/server/demo/data";
 import { db } from "@/server/repositories";
+import { getCachedBranches, getCachedDoctor } from "@/server/cache/reference-data";
 
 /**
  * Session abstraction.
@@ -136,14 +137,14 @@ async function resolveRealUser(claims: TokenClaims): Promise<SessionUser | null>
   let branchIds: string[] = [];
 
   if (account.role === "DOCTOR" && account.linkId) {
-    const doctor = await db.doctors.get(account.linkId);
+    const doctor = await getCachedDoctor(account.linkId);
     branchIds = doctor?.branchIds ?? [];
     branchId = branchIds[0];
   } else if (account.role === "RECEPTIONIST" && account.linkId) {
     branchId = account.branchId;
     branchIds = branchId ? [branchId] : [];
   } else if (account.role === "ADMIN") {
-    branchIds = (await db.branches.list()).map((b) => b.id);
+    branchIds = (await getCachedBranches()).map((b) => b.id);
   }
 
   return {

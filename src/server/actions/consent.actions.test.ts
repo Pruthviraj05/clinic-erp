@@ -9,7 +9,7 @@ vi.mock("next/headers", () => ({
       name === "clinicore_role" ? { name, value: currentRole.value } : undefined,
   }),
 }));
-vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
+vi.mock("next/cache", () => ({ revalidatePath: () => {}, revalidateTag: () => {}, unstable_cache: (fn) => fn }));
 
 const { createConsentAction, updateConsentAction, signConsentAction, doctorSignConsentAction, declineConsentAction } =
   await import("./consent.actions");

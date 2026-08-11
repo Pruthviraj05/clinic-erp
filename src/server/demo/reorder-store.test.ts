@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import type { Medicine } from "@/types/domain";
 
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
-vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
+vi.mock("next/cache", () => ({ revalidatePath: () => {}, revalidateTag: () => {}, unstable_cache: (fn) => fn }));
 
 const { reorderSuggestions, dataQualityIssues, dailyUsageByMedicine } = await import("./reorder-store");
 const { receiveStock, planDispense, commitDispense, writeOffBatch } = await import("./batch-store");

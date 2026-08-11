@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireRole } from "@/lib/guard";
 import { can } from "@/lib/rbac";
 import { db } from "@/server/repositories";
+import { getCachedBranches, getCachedDoctors } from "@/server/cache/reference-data";
 import { PageHeader } from "@/components/shared/page-header";
 import { BranchesView } from "@/features/staff/branches-view";
 
@@ -12,8 +13,8 @@ export default async function AdminBranchesPage() {
   const role = session.user.role;
 
   const [branches, doctors, receptionists] = await Promise.all([
-    db.branches.list(),
-    db.doctors.list(),
+    getCachedBranches(),
+    getCachedDoctors(),
     db.receptionists.list(),
   ]);
 

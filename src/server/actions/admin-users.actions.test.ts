@@ -8,7 +8,7 @@ vi.mock("next/headers", () => ({
       name === "clinicore_role" ? { name, value: currentRole.value } : undefined,
   }),
 }));
-vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
+vi.mock("next/cache", () => ({ revalidatePath: () => {}, revalidateTag: () => {}, unstable_cache: (fn) => fn }));
 
 const { createAdminAction, setUserActiveAction } = await import("./admin-users.actions");
 const { verifyPassword } = await import("@/server/demo/users-store");

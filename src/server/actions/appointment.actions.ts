@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { newId } from "@/lib/ids";
 import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
+import { getCachedBranch, getCachedDoctor } from "@/server/cache/reference-data";
 import { logAudit } from "@/server/demo/extra";
 import { createAppointmentSchema, rescheduleSchema, updateStatusSchema } from "@/features/appointments/schema";
 import type { Appointment, AppointmentStatus } from "@/types/domain";
@@ -50,8 +51,8 @@ export async function createAppointmentAction(
 
   const [patient, doctor, branch] = await Promise.all([
     db.patients.get(input.patientId),
-    db.doctors.get(input.doctorId),
-    db.branches.get(input.branchId),
+    getCachedDoctor(input.doctorId),
+    getCachedBranch(input.branchId),
   ]);
   if (!patient || !doctor || !branch) {
     return { ok: false, message: "Invalid patient, doctor or branch." };

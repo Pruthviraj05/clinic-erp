@@ -5,6 +5,7 @@ import { getBillingSummary, listInvoices } from "@/server/services/billing.servi
 import { getPrescription } from "@/server/services/prescriptions.service";
 import { matchPrescribedMedicines } from "@/lib/medicine-match";
 import { db } from "@/server/repositories";
+import { getCachedBranches, getCachedDoctors } from "@/server/cache/reference-data";
 import { toMedicineOptions } from "@/lib/medicine-options";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
@@ -25,8 +26,8 @@ export default async function ReceptionBillingPage({
   const [invoices, summary, branches, doctors, medicines, batches, patients, prescription] = await Promise.all([
     listInvoices(user),
     getBillingSummary(user),
-    db.branches.list(),
-    db.doctors.list(),
+    getCachedBranches(),
+    getCachedDoctors(),
     db.medicines.list(),
     db.medicineBatches.list(),
     db.patients.list(),

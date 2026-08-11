@@ -5,6 +5,7 @@ import { newId } from "@/lib/ids";
 import { z } from "zod";
 import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
+import { getCachedBranch, getCachedDoctor } from "@/server/cache/reference-data";
 import { logAudit } from "@/server/demo/extra";
 import { PHARMACY_GST_RATE, round2 } from "@/lib/billing-rates";
 import { commitDispense, planDispense, restoreDispense, type DispenseLine } from "@/server/demo/batch-store";
@@ -61,7 +62,7 @@ export async function createPharmacyBillAction(
 
   const patient = await db.patients.get(payload.patientId);
   if (!patient) return { ok: false, message: "Please select a patient." };
-  const branch = await db.branches.get(payload.branchId);
+  const branch = await getCachedBranch(payload.branchId);
   if (!branch) return { ok: false, message: "Invalid branch." };
 
   const items = (payload.items ?? []).filter((i) => i.medicineId && i.quantity > 0);
@@ -192,8 +193,8 @@ export async function createConsultationInvoiceAction(
 
   const [patient, doctor, branch] = await Promise.all([
     db.patients.get(input.patientId),
-    db.doctors.get(input.doctorId),
-    db.branches.get(input.branchId),
+    getCachedDoctor(input.doctorId),
+    getCachedBranch(input.branchId),
   ]);
   if (!patient || !doctor || !branch) return { ok: false, message: "Invalid patient, doctor or branch." };
 

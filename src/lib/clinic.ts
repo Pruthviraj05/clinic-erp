@@ -1,4 +1,4 @@
-import { db } from "@/server/repositories";
+import { getCachedBranch } from "@/server/cache/reference-data";
 
 export interface ClinicHeader {
   name: string;
@@ -9,7 +9,7 @@ export interface ClinicHeader {
 
 /** Build a printable clinic header from a branch id. */
 export async function clinicFromBranch(branchId: string): Promise<ClinicHeader> {
-  const branch = await db.branches.get(branchId);
+  const branch = await getCachedBranch(branchId);
   return {
     name: branch?.name ?? "Clinic",
     address: [branch?.city, "India"].filter(Boolean).join(", "),

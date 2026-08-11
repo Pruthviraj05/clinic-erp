@@ -490,6 +490,49 @@ missing cache invalidation). If something still looks off when you click
 through it yourself, it's likely in that gap — say what you're seeing and
 it's fast to track down from here.
 
+## 4g. Server-side data caching + cookie notice
+
+Added `unstable_cache`-backed caching for the reference data every page reads
+on nearly every request — branches, doctors, and the seven masters lists
+(departments, specializations, medicine categories, lab tests, investigations,
+suppliers, tax rates). Lives in one new module, `src/server/cache/reference-data.ts`,
+sitting transparently above the existing `db` storage port — no adapter changes,
+works the same under demo and MongoDB data modes.
+
+- **5-minute TTL as a safety net, not the primary invalidation.** Every write
+  action that touches branches, doctors, or a masters group now also calls
+  `revalidateTag()` for that tag, so edits show up immediately; the TTL just
+  bounds staleness if a tag is ever missed.
+- **Fixed a real staleness gap while wiring this up**: masters writes were
+  only revalidating `/admin/masters` — never `/admin/doctors` (which reads
+  specializations/departments) or the inventory pages (which read suppliers).
+  Invisible before because nothing was cached; would have caused genuinely
+  stale dropdowns once caching landed. Now `revalidateMasters()` revalidates
+  the right pages per group.
+- Swapped ~25 call sites onto the cached reads — every place that listed all
+  branches/doctors for a page, plus the hot paths that run on *every*
+  authenticated request: `getSession()` (branch resolution) and the app shell
+  (branch name in the topbar).
+- **One thing `unstable_cache` can't do**: cache a call with a filter
+  *function* as an argument (inventory's supplier list used to be fetched as
+  `db.masters.suppliers.list(s => s.active)`). Fixed by fetching the full
+  cached list and filtering client-side after — same result, still cached.
+- Added a plain cookie/privacy notice (`src/components/layout/cookie-consent.tsx`),
+  not a consent-gathering banner — Clinicore only sets functional cookies
+  (session, theme, sidebar state), there's nothing to opt in or out of. It
+  tells people that once, doesn't block the page, and remembers the
+  acknowledgment in `localStorage` (not a cookie — setting a cookie to
+  remember someone was told about cookies, before they were told, is the
+  wrong order of operations).
+
+Verified: `tsc --noEmit`, `npm run lint`, `npm test -- --run` (183/183,
+after fixing a mock gap — 11 test files' `next/cache` mocks didn't stub
+`unstable_cache`, which `getSession()` now transitively calls), `npm run
+build` (56/56 static pages), and a browser check confirming the banner
+renders and cached pages (dashboard, doctors list) load correctly.
+
+---
+
 ## 5. Performance and scale
 
 ### Done this session

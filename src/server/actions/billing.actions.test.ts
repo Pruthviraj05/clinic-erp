@@ -13,7 +13,7 @@ vi.mock("next/headers", () => ({
     get: (name: string) => (name === "clinicore_role" ? { name, value: currentRole.value } : undefined),
   }),
 }));
-vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
+vi.mock("next/cache", () => ({ revalidatePath: () => {}, revalidateTag: () => {}, unstable_cache: (fn) => fn }));
 
 const { createPharmacyBillAction, createConsultationInvoiceAction, saveBillDesignAction } = await import(
   "./billing.actions"

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireRole } from "@/lib/guard";
 import { listAppointments } from "@/server/services/appointments.service";
 import { db } from "@/server/repositories";
+import { getCachedBranches, getCachedDoctors } from "@/server/cache/reference-data";
 import { PageHeader } from "@/components/shared/page-header";
 import { AppointmentsView } from "@/features/appointments/appointments-view";
 
@@ -11,8 +12,8 @@ export default async function AdminAppointmentsPage() {
   const { user } = await requireRole("ADMIN");
   const [appointments, branches, doctors, patients] = await Promise.all([
     listAppointments(user, { range: "all" }),
-    db.branches.list(),
-    db.doctors.list(),
+    getCachedBranches(),
+    getCachedDoctors(),
     db.patients.list(),
   ]);
 

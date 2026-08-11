@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
+import { CookieConsent } from "@/components/layout/cookie-consent";
 import { appConfig } from "@/config/app.config";
 
 const geistSans = Geist({
@@ -45,6 +46,7 @@ export default function RootLayout({
           <TooltipProvider delay={200}>
             {children}
             <Toaster richColors position="top-right" />
+            <CookieConsent />
           </TooltipProvider>
         </ThemeProvider>
       </body>

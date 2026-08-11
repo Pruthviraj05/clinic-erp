@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { requireRole } from "@/lib/guard";
 import { can } from "@/lib/rbac";
-import { db } from "@/server/repositories";
+import { getCachedBranches, getCachedDoctors, getCachedMasters } from "@/server/cache/reference-data";
 import { PageHeader } from "@/components/shared/page-header";
 import { DoctorsView } from "@/features/staff/doctors-view";
 
@@ -11,12 +11,14 @@ export default async function AdminDoctorsPage() {
   const session = await requireRole("ADMIN");
   const role = session.user.role;
 
-  const [branches, doctors, specializations, departments] = await Promise.all([
-    db.branches.list(),
-    db.doctors.list(),
-    db.masters.specializations.list((s) => s.active),
-    db.masters.departments.list((d) => d.active),
+  const [branches, doctors, specializationRows, departmentRows] = await Promise.all([
+    getCachedBranches(),
+    getCachedDoctors(),
+    getCachedMasters("specializations"),
+    getCachedMasters("departments"),
   ]);
+  const specializations = specializationRows.filter((s) => s.active);
+  const departments = departmentRows.filter((d) => d.active);
   const branchNames = Object.fromEntries(branches.map((b) => [b.id, b.name]));
   const branchOptions = branches
     .filter((b) => b.isActive)

@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/guard";
 import { can } from "@/lib/rbac";
 import { listAppointments } from "@/server/services/appointments.service";
 import { db } from "@/server/repositories";
+import { getCachedBranches, getCachedDoctors } from "@/server/cache/reference-data";
 import { PageHeader } from "@/components/shared/page-header";
 import { CalendarBoard } from "@/features/calendar/calendar-board";
 
@@ -12,8 +13,8 @@ export default async function ReceptionCalendarPage() {
   const { user } = await requireRole("RECEPTIONIST");
   const [appointments, branches, doctors, patients] = await Promise.all([
     listAppointments(user, { range: "all" }),
-    db.branches.list(),
-    db.doctors.list(),
+    getCachedBranches(),
+    getCachedDoctors(),
     db.patients.list(),
   ]);
   const branchDoctors = doctors.filter((d) => !user.branchId || d.branchIds.includes(user.branchId));

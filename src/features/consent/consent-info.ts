@@ -1,4 +1,5 @@
 import { db } from "@/server/repositories";
+import { getCachedBranch, getCachedDoctor } from "@/server/cache/reference-data";
 import { getRxDesignFor } from "@/server/demo/rx-design-store";
 import type { ClinicInfo } from "@/features/prescriptions/prescription-detail";
 import type { ConsentPatientInfo } from "./consent-detail";
@@ -17,10 +18,10 @@ export async function consentInfoFor(form: ConsentFormItem): Promise<{
   patient?: ConsentPatientInfo;
   accentColor: string;
 }> {
-  const doctor = form.doctorId ? await db.doctors.get(form.doctorId) : null;
+  const doctor = form.doctorId ? await getCachedDoctor(form.doctorId) : null;
   const branchId = form.branchId ?? doctor?.branchIds[0];
   const [branch, patient, design] = await Promise.all([
-    branchId ? db.branches.get(branchId) : Promise.resolve(null),
+    branchId ? getCachedBranch(branchId) : Promise.resolve(null),
     db.patients.get(form.patientId),
     form.doctorId ? getRxDesignFor(form.doctorId, branchId) : Promise.resolve(null),
   ]);

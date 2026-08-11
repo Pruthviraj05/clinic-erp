@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requirePermission } from "@/lib/guard";
 import { db } from "@/server/repositories";
+import { getCachedDoctors } from "@/server/cache/reference-data";
 import { can } from "@/lib/rbac";
 import { getPatientBundle } from "@/server/services/patients.service";
 import { PageHeader } from "@/components/shared/page-header";
@@ -11,7 +12,7 @@ export const metadata: Metadata = { title: "Consent Forms" };
 /** Consent forms assigned to this doctor — editable until the patient signs. */
 export default async function DoctorConsentPage() {
   const { user } = await requirePermission("consent", "view");
-  const [allConsentForms, doctors] = await Promise.all([db.consentForms.list(), db.doctors.list()]);
+  const [allConsentForms, doctors] = await Promise.all([db.consentForms.list(), getCachedDoctors()]);
   const mine = allConsentForms.filter((c) => c.doctorId === user.linkId);
   const doctorOptions = doctors
     .filter((d) => d.isActive)

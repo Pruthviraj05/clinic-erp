@@ -15,7 +15,7 @@ vi.mock("next/headers", () => ({
   }),
 }));
 
-vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
+vi.mock("next/cache", () => ({ revalidatePath: () => {}, revalidateTag: () => {}, unstable_cache: (fn) => fn }));
 
 const { updatePrescriptionAction, createPrescriptionAction, saveRxDesignAction } = await import(
   "./prescription.actions"

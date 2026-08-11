@@ -3,6 +3,7 @@
 import { getSession } from "@/lib/session";
 import { can } from "@/lib/rbac";
 import { db } from "@/server/repositories";
+import { getCachedDoctors } from "@/server/cache/reference-data";
 import { listPatients } from "@/server/services/patients.service";
 import { listAppointments } from "@/server/services/appointments.service";
 import { listPrescriptions } from "@/server/services/prescriptions.service";
@@ -119,7 +120,7 @@ export async function globalSearchAction(rawQuery: string): Promise<SearchResult
   }
 
   if (can(user.role, "doctors", "view")) {
-    const doctors = await db.doctors.list();
+    const doctors = await getCachedDoctors();
     results.doctors = doctors
       .filter((d) => matches(query, d.fullName, d.specialization, d.registrationNo))
       .slice(0, LIMIT)

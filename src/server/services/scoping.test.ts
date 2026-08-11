@@ -9,7 +9,7 @@ import type { SessionUser } from "@/lib/session";
  * missing or mismatched link must see nothing, never the whole clinic.
  */
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
-vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
+vi.mock("next/cache", () => ({ revalidatePath: () => {}, revalidateTag: () => {}, unstable_cache: (fn) => fn }));
 
 const { listPrescriptions, getPrescription } = await import("./prescriptions.service");
 const { listInvoices } = await import("./billing.service");

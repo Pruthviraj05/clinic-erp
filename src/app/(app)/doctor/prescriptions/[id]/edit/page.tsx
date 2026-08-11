@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { requirePermission } from "@/lib/guard";
 import { getPrescription, listPrescriptions } from "@/server/services/prescriptions.service";
 import { db } from "@/server/repositories";
+import { getCachedDoctor } from "@/server/cache/reference-data";
 import { getRxTemplatesFor } from "@/server/demo/template-store";
 import { getRxDesignFor } from "@/server/demo/rx-design-store";
 import { groupsForDoctor } from "@/server/demo/disease-store";
@@ -56,7 +57,7 @@ export default async function EditPrescriptionPage({ params }: { params: Promise
 
   const [history, doctor, templates, medicines, rxDesign] = await Promise.all([
     listPrescriptions(user, patient.id).then((rows) => rows.filter((p) => p.id !== rx.id)),
-    db.doctors.get(rx.doctorId),
+    getCachedDoctor(rx.doctorId),
     getRxTemplatesFor(user.linkId ?? user.id),
     db.medicines.list(),
     getRxDesignFor(user.linkId ?? rx.doctorId, rx.branchId),

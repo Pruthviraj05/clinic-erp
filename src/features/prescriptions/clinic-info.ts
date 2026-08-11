@@ -1,4 +1,5 @@
 import { db } from "@/server/repositories";
+import { getCachedBranch, getCachedDoctor } from "@/server/cache/reference-data";
 import { getRxDesignFor, type RxDesign } from "@/server/demo/rx-design-store";
 import type { ClinicInfo, RxPatientInfo } from "./prescription-detail";
 import type { Prescription } from "@/types/domain";
@@ -16,8 +17,8 @@ export async function clinicInfoFor(rx: Prescription): Promise<{
   design: RxDesign;
 }> {
   const [branch, doctor, patient, design] = await Promise.all([
-    db.branches.get(rx.branchId),
-    db.doctors.get(rx.doctorId),
+    getCachedBranch(rx.branchId),
+    getCachedDoctor(rx.doctorId),
     db.patients.get(rx.patientId),
     getRxDesignFor(rx.doctorId, rx.branchId),
   ]);

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireRole } from "@/lib/guard";
 import { db } from "@/server/repositories";
+import { getCachedDoctor } from "@/server/cache/reference-data";
 import { ROLES } from "@/lib/rbac";
 import { PageHeader } from "@/components/shared/page-header";
 import { ProfileForm } from "@/features/profile/profile-form";
@@ -15,7 +16,7 @@ export default async function ProfilePage() {
   let registrationNo: string | null | undefined;
 
   if (user.role === "DOCTOR" && user.linkId) {
-    const doctor = await db.doctors.get(user.linkId);
+    const doctor = await getCachedDoctor(user.linkId);
     phone = doctor?.phone;
     qualifications = doctor?.qualifications;
     registrationNo = doctor?.registrationNo;

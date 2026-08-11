@@ -3,6 +3,7 @@ import { Package, AlertTriangle, CalendarClock, IndianRupee } from "lucide-react
 import { requireRole } from "@/lib/guard";
 import { can } from "@/lib/rbac";
 import { db } from "@/server/repositories";
+import { getCachedMasters } from "@/server/cache/reference-data";
 import { dataQualityIssues, reorderSuggestions } from "@/server/demo/reorder-store";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
@@ -20,10 +21,11 @@ export default async function AdminInventoryPage() {
     db.medicines.list(),
     db.stockMovements.list(),
     db.medicineBatches.list(),
-    db.masters.suppliers.list((s) => s.active),
+    getCachedMasters("suppliers"),
     reorderSuggestions(),
     dataQualityIssues(),
   ]);
+  const supplierRowsActive = supplierRows.filter((s) => s.active);
 
   const lowStock = medicines.filter((m) => m.stockQty <= m.reorderLevel).length;
 
@@ -73,7 +75,7 @@ export default async function AdminInventoryPage() {
         batches={batches}
         suggestions={suggestions}
         dataQuality={dataQuality.map(({ key, label, count, why }) => ({ key, label, count, why }))}
-        suppliers={supplierRows.map((s) => s.name)}
+        suppliers={supplierRowsActive.map((s) => s.name)}
         canEdit={canEdit}
         canDelete={canDelete}
       />

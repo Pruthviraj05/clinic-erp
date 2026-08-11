@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
@@ -31,6 +31,23 @@ function nextId() {
   return `ms_${Date.now()}_${seq}`;
 }
 
+/**
+ * `/admin/masters` isn't the only screen reading this group — departments and
+ * specializations feed the doctor form, suppliers feed both inventory
+ * screens. Those pages were never revalidated before (a pre-existing gap,
+ * previously invisible since nothing was cached — every fresh navigation
+ * just re-read the DB) and now matter for real, since the reads are cached.
+ */
+function revalidateMasters(group: string) {
+  revalidatePath("/admin/masters");
+  if (group === "departments" || group === "specializations") revalidatePath("/admin/doctors");
+  if (group === "suppliers") {
+    revalidatePath("/admin/inventory");
+    revalidatePath("/reception/inventory");
+  }
+  revalidateTag("masters");
+}
+
 /** Create (no id) or update (hidden id) a master row for the given group. */
 export async function saveMasterRowAction(
   _prev: ActionResult | null,
@@ -59,7 +76,7 @@ export async function saveMasterRowAction(
       entity: "Master",
       summary: `Updated ${group} entry "${name}"`,
     });
-    revalidatePath("/admin/masters");
+    revalidateMasters(group);
     return { ok: true, message: `Updated ${name}.`, data: updated };
   }
 
@@ -72,7 +89,7 @@ export async function saveMasterRowAction(
     entity: "Master",
     summary: `Added ${group} entry "${name}"`,
   });
-  revalidatePath("/admin/masters");
+  revalidateMasters(group);
   return { ok: true, message: `Added ${name}.`, data: row };
 }
 
@@ -102,6 +119,6 @@ export async function toggleMasterActiveAction(
     entity: "Master",
     summary: `${active ? "Reactivated" : "Deactivated"} ${group} entry "${updated.name}"`,
   });
-  revalidatePath("/admin/masters");
+  revalidateMasters(group);
   return { ok: true, message: `${updated.name} ${active ? "reactivated" : "deactivated"}.`, data: updated };
 }

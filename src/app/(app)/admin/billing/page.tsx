@@ -3,6 +3,7 @@ import { IndianRupee, Receipt, AlertCircle, CheckCircle2 } from "lucide-react";
 import { requireRole } from "@/lib/guard";
 import { getBillingSummary, listInvoices } from "@/server/services/billing.service";
 import { db } from "@/server/repositories";
+import { getCachedBranches, getCachedDoctors } from "@/server/cache/reference-data";
 import { toMedicineOptions } from "@/lib/medicine-options";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
@@ -18,8 +19,8 @@ export default async function AdminBillingPage() {
   const [invoices, summary, branches, doctors, medicines, batches, patients] = await Promise.all([
     listInvoices(user),
     getBillingSummary(user),
-    db.branches.list(),
-    db.doctors.list(),
+    getCachedBranches(),
+    getCachedDoctors(),
     db.medicines.list(),
     db.medicineBatches.list(),
     db.patients.list(),

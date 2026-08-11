@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireRole } from "@/lib/guard";
 import { db } from "@/server/repositories";
+import { getCachedBranches, getCachedDoctors } from "@/server/cache/reference-data";
 import { PageHeader } from "@/components/shared/page-header";
 import { AppointmentsView } from "@/features/appointments/appointments-view";
 
@@ -16,8 +17,8 @@ export default async function PortalAppointmentsPage({
   const [allPatients, allAppointments, branches, doctors] = await Promise.all([
     db.patients.list(),
     db.appointments.list(),
-    db.branches.list(),
-    db.doctors.list(),
+    getCachedBranches(),
+    getCachedDoctors(),
   ]);
   // Degrade instead of throwing if the account is not linked to a patient.
   const me = allPatients.find((p) => p.id === user.linkId);

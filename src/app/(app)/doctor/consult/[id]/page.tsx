@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/guard";
 import { getAppointment } from "@/server/services/appointments.service";
 import { listPrescriptions } from "@/server/services/prescriptions.service";
 import { db } from "@/server/repositories";
+import { getCachedDoctor } from "@/server/cache/reference-data";
 import { getRxTemplatesFor } from "@/server/demo/template-store";
 import { getRxDesignFor } from "@/server/demo/rx-design-store";
 import { groupsForDoctor } from "@/server/demo/disease-store";
@@ -28,7 +29,7 @@ export default async function DoctorConsultPage({ params }: { params: Promise<{ 
 
   const [history, doctor, templates, medicines, rxDesign, diseaseGroups, clinic] = await Promise.all([
     listPrescriptions(user, patient.id),
-    db.doctors.get(appointment.doctorId),
+    getCachedDoctor(appointment.doctorId),
     getRxTemplatesFor(user.linkId ?? appointment.doctorId),
     db.medicines.list(),
     getRxDesignFor(user.linkId ?? appointment.doctorId, appointment.branchId),
