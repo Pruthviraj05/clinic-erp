@@ -86,8 +86,9 @@ const READ: PermissionAction[] = ["view"];
  * Deliberate choices:
  * - Nobody deletes clinical records (prescriptions/EMR) — medico-legal trail;
  *   appointments are cancelled via status, not deleted.
- * - Receptionists run the front desk (patients/appointments/billing) but never
- *   see clinical analytics, inventory costs or administration.
+ * - Receptionists run the front desk (patients/appointments/billing) and the
+ *   pharmacy counter (receive/adjust stock), but never write off stock, see
+ *   clinical analytics, or reach administration.
  * - Doctors own the clinical modules for their patients; billing is read-only
  *   context, administration is closed.
  * - Patients see and print their own records; they never mutate clinical data.
@@ -132,6 +133,7 @@ export const PERMISSIONS: Record<Role, Partial<Record<Module, PermissionAction[]
     appointments: MANAGE,
     patients: ["view", "create", "edit", "export", "print"],
     billing: MANAGE,
+    inventory: MANAGE, // day-to-day stock (receive, adjust) — write-off stays admin-only
     calendar: READ,
     consent: ["view", "create", "edit", "print"],
     notifications: READ,

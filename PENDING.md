@@ -286,8 +286,34 @@ Not copied from eVitalRx, deliberately: distributor ledgers, purchase orders,
 gate passes, warehouse transfers and e-invoicing are wholesale-pharmacy
 concerns and would be clutter in a single-doctor clinic.
 
-Not yet reviewed: their Reports section, which is behind an expired
-subscription on your account and could not be opened.
+Not reviewed: their Reports section, and now the rest of the app too — the
+eVitalRx subscription on your account has fully expired, so no more of it can
+be checked. Everything worth taking from Sales, Purchase and Inventory has
+already been extracted above.
+
+**Third pass — accountability and who gets access**
+
+- **"Received by" is now shown on the Batches and Expiry tabs**, not just
+  buried in the Movements log. Every lot already recorded who received it
+  (`receivedBy`); it just wasn't visible next to the stock itself. Every stock
+  change was already attributed to a user — receiving (`receivedBy` on the
+  batch), adjustments, sales and write-offs (`by` on the movement) — and the
+  Stock tab already showed "Updated by" per medicine, and the Movements tab
+  the full history with who and when. That coverage was already complete; the
+  batch table was the one place it was missing.
+- **Receptionists now have their own Inventory screen** (`/reception/inventory`,
+  same view as admin's) with permission to view, receive and adjust stock —
+  matching eVitalRx's separate "inventory user" role, since in a real clinic
+  the front desk restocks and counts, not the doctor and not necessarily the
+  owner in person. **Write-off stays admin-only** — destroying stock value
+  needs a manager's call, not a front-desk one.
+- **Doctors intentionally do not get inventory access.** Their job is
+  prescribing, not stock — RBAC keeps `inventory` off the doctor role
+  entirely. One thing doctors *could* use but don't have yet: the medicine
+  autocomplete in the consult screen doesn't show whether a drug is in stock,
+  so a doctor can prescribe something reception then can't dispense. Not built
+  in this pass (it touches the consult UI, not inventory) — flagging it here
+  as a candidate for later, since it fits the "doctor perspective" gap.
 
 ## 5. Performance and scale
 

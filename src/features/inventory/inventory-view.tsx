@@ -360,7 +360,12 @@ export function InventoryView({
       {
         accessorKey: "receivedAt",
         header: "Received",
-        cell: ({ row }) => <span className="text-sm whitespace-nowrap">{formatDate(row.original.receivedAt)}</span>,
+        cell: ({ row }) => (
+          <div className="leading-tight">
+            <div className="text-sm whitespace-nowrap">{formatDate(row.original.receivedAt)}</div>
+            <div className="text-[11px] text-muted-foreground">{row.original.receivedBy}</div>
+          </div>
+        ),
       },
       ...(canDelete
         ? [
@@ -449,6 +454,7 @@ export function InventoryView({
               Supplier: b.supplierName ?? "",
               Bill: b.purchaseBillNo ?? "",
               ReceivedOn: formatDate(b.receivedAt),
+              ReceivedBy: b.receivedBy,
             })}
           />
         </TabsContent>

@@ -114,6 +114,7 @@ const RECEPTION_NAV: NavSection[] = [
       { label: "Appointments", href: "/reception/appointments", icon: CalendarDays },
       { label: "Patients", href: "/reception/patients", icon: Users },
       { label: "Billing", href: "/reception/billing", icon: Receipt },
+      { label: "Inventory", href: "/reception/inventory", icon: Package },
       { label: "Consent Forms", href: "/reception/consent", icon: FileSignature },
       { label: "Calendar", href: "/reception/calendar", icon: CalendarRange },
       { label: "Notifications", href: "/reception/notifications", icon: Bell },
