@@ -15,9 +15,18 @@ vi.mock("next/headers", () => ({
 }));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
-const { createPharmacyBillAction } = await import("./billing.actions");
+const { createPharmacyBillAction, createConsultationInvoiceAction, saveBillDesignAction } = await import(
+  "./billing.actions"
+);
 const { db } = await import("@/server/repositories");
 const { receiveStock } = await import("@/server/demo/batch-store");
+const { getBillDesignFor } = await import("@/server/demo/bill-design-store");
+
+function fd(fields: Record<string, string>): FormData {
+  const f = new FormData();
+  for (const [k, v] of Object.entries(fields)) f.append(k, v);
+  return f;
+}
 
 const patient: Patient = {
   id: "pat_bill_test",
@@ -152,5 +161,82 @@ describe("createPharmacyBillAction", () => {
     expect(res.ok).toBe(false);
     expect(res.message).toMatch(/permission/i);
     currentRole.value = "RECEPTIONIST";
+  });
+
+  it("stamps the bill as PHARMACY", async () => {
+    const res = await createPharmacyBillAction({
+      patientId: patient.id,
+      branchId: "br_ravet",
+      items: [{ medicineId: "med_bill_c", quantity: 1 }],
+    });
+    expect(res.ok).toBe(true);
+    expect(res.data!.invoiceKind).toBe("PHARMACY");
+  });
+});
+
+describe("createConsultationInvoiceAction", () => {
+  it("stamps the invoice as CONSULTATION", async () => {
+    currentRole.value = "RECEPTIONIST";
+    const res = await createConsultationInvoiceAction(
+      null,
+      fd({
+        patientId: patient.id,
+        branchId: "br_ravet",
+        doctorId: "doc_bhosikar",
+        amount: "500",
+        gstRate: "0.18",
+        payment: "PAID_FULL",
+      }),
+    );
+    expect(res.ok).toBe(true);
+    expect(res.data!.invoiceKind).toBe("CONSULTATION");
+    expect(res.data!.status).toBe("PAID");
+  });
+});
+
+describe("saveBillDesignAction", () => {
+  it("saves the pharmacy and consultation letterheads independently", async () => {
+    currentRole.value = "ADMIN";
+    const pharmacyRes = await saveBillDesignAction({
+      kind: "PHARMACY",
+      documentTitle: "PHARMACY RECEIPT",
+      headerNote: "",
+      footerNote: "No returns on medicines.",
+      accentColor: "#166534",
+    });
+    expect(pharmacyRes.ok).toBe(true);
+
+    const consultationDesign = await getBillDesignFor("CONSULTATION");
+    // Untouched — saving the pharmacy design must not bleed into the other kind.
+    expect(consultationDesign.documentTitle).toBe("TAX INVOICE");
+
+    const pharmacyDesign = await getBillDesignFor("PHARMACY");
+    expect(pharmacyDesign.documentTitle).toBe("PHARMACY RECEIPT");
+    expect(pharmacyDesign.accentColor).toBe("#166534");
+  });
+
+  it("denies non-admin roles", async () => {
+    currentRole.value = "RECEPTIONIST";
+    const res = await saveBillDesignAction({
+      kind: "CONSULTATION",
+      documentTitle: "TAX INVOICE",
+      headerNote: "",
+      footerNote: "",
+      accentColor: "#0f766e",
+    });
+    expect(res.ok).toBe(false);
+    currentRole.value = "RECEPTIONIST";
+  });
+
+  it("rejects an invalid accent colour", async () => {
+    currentRole.value = "ADMIN";
+    const res = await saveBillDesignAction({
+      kind: "PHARMACY",
+      documentTitle: "PHARMACY RECEIPT",
+      headerNote: "",
+      footerNote: "",
+      accentColor: "#123456",
+    });
+    expect(res.ok).toBe(false);
   });
 });

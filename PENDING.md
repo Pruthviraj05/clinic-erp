@@ -441,6 +441,55 @@ a drag-and-drop canvas can (overlapping elements, content that doesn't fit
 its box). If pixel-level layout control turns out to matter, that's a
 separate, much larger effort.
 
+## 4f. Testing pass on the above — 3 real bugs found and fixed
+
+Added 32 new automated tests targeting every piece of server-side logic from
+4e that had none (151 → 183 passing) — appointment booking source, the Rx
+Design save/branch-override path, invoice kind stamping, the bill-design
+save action, and the reports data builder. Writing those tests, and reading
+back through the client code they don't reach, surfaced three real bugs:
+
+- **Booking from the calendar didn't refresh the calendar.** `createAppointmentAction`
+  (and the status-change/reschedule actions) revalidated the appointment
+  *list* pages but never `/admin/calendar` or `/reception/calendar` —
+  meaning the calendar-click-to-book feature added in 4e would close the
+  dialog on a successful booking but leave the just-booked appointment
+  invisible until the page was manually reloaded. Fixed by consolidating
+  the three duplicated revalidation blocks into one `revalidateAppointments()`
+  helper that includes both calendars, so this can't drift out of sync again.
+- **Switching branches on the Rx Design page showed stale values.** The
+  branch selector navigates via a searchParam, which re-fetches the design
+  server-side but doesn't remount the form component client-side — so
+  `useState(design.headerNote)` and friends kept showing the *previous*
+  branch's values after switching, even though the correct design had
+  already loaded. Fixed with `key={branchId}` on the form to force a clean
+  remount per branch, the same fix already correctly in place for the
+  pharmacy/consultation bill-design tabs.
+- **A demo-role profile edit could silently do nothing while claiming
+  success.** The `/dev-login` role-switcher issues a synthetic session not
+  backed by any row in the `users` collection for two of the four roles
+  (receptionist and patient specifically — doctor and admin happen to share
+  an id with a real seeded account, which is what let this slip past
+  before). Saving a profile under one of those sessions called
+  `db.users.update()` on a nonexistent id, which no-ops rather than
+  throwing, so the action returned "Profile updated" while nothing was
+  written. Fixed by checking the update actually found a row and returning
+  an honest failure message otherwise. This only affects the hidden demo
+  role-switcher — a real credentials login always has a backing account.
+
+**Not independently re-verified by clicking through the UI**: the sandbox's
+browser pane wasn't compositing frames in this session (a tool/display-state
+issue, not a code issue — screenshots and coordinate-based clicks both
+failed the same way against a fresh tab and a fresh server). Verification
+here relied on: the expanded automated suite, `read_page` DOM/accessibility-tree
+inspection of every changed screen after real navigation (confirmed correct
+markup, labels, and data on the appointments/calendar/reports/consult/
+rx-design/disease-lists/profile/settings pages), and re-reading the client
+logic by hand for the class of bug tests can't catch (stale client state,
+missing cache invalidation). If something still looks off when you click
+through it yourself, it's likely in that gap — say what you're seeing and
+it's fast to track down from here.
+
 ## 5. Performance and scale
 
 ### Done this session

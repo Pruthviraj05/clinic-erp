@@ -39,9 +39,14 @@ export async function updateProfileAction(
   const input = parsed.data;
   const fullName = user.role !== "PATIENT" ? input.fullName : undefined;
 
-  await db.users.update(user.id, {
+  const account = await db.users.update(user.id, {
     ...(fullName ? { fullName } : {}),
   });
+  if (!account) {
+    // Only reachable via the demo role-switcher, whose sessions are synthetic
+    // and unrelated to the `users` collection — nothing to persist against.
+    return { ok: false, message: "This preview session isn't linked to a real account, so nothing was saved." };
+  }
 
   if (user.role === "DOCTOR" && user.linkId) {
     await db.doctors.update(user.linkId, {

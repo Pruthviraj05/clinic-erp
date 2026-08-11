@@ -30,6 +30,11 @@ export default async function DoctorRxDesignPage({
         description="Your own header, footer, accent colour, print language and section order."
       />
       <RxDesignForm
+        // Force a remount on branch switch — the form's fields are seeded from
+        // `design` only on mount, and this stays the same route/component
+        // instance across a searchParam-only navigation otherwise, so a stale
+        // design would keep showing after switching branches.
+        key={branchId ?? "default"}
         design={design}
         accents={[...RX_ACCENTS]}
         branchOptions={branches.map((b) => ({ id: b.id, label: b.name }))}

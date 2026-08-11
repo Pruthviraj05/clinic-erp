@@ -15,6 +15,17 @@ export interface ActionResult<T = unknown> {
   fieldErrors?: Record<string, string[]>;
 }
 
+/** Every screen that lists or schedules appointments — the list views and the calendars. */
+function revalidateAppointments() {
+  revalidatePath("/admin/appointments");
+  revalidatePath("/reception/appointments");
+  revalidatePath("/doctor/appointments");
+  revalidatePath("/portal/appointments");
+  revalidatePath("/admin/calendar");
+  revalidatePath("/reception/calendar");
+  revalidatePath("/doctor/calendar");
+}
+
 /** Create an appointment: validates patient/doctor/branch, blocks slot clashes, assigns a token. */
 export async function createAppointmentAction(
   _prev: ActionResult | null,
@@ -94,10 +105,7 @@ export async function createAppointmentAction(
     summary: `Booked ${appt.patientName} with ${appt.doctorName}`,
   });
 
-  revalidatePath("/admin/appointments");
-  revalidatePath("/reception/appointments");
-  revalidatePath("/doctor/appointments");
-  revalidatePath("/portal/appointments");
+  revalidateAppointments();
   return { ok: true, message: "Appointment booked.", data: appt };
 }
 
@@ -129,9 +137,7 @@ export async function updateAppointmentStatusAction(
     summary: `${updated.patientName} marked ${status.toLowerCase().replace("_", " ")}`,
   });
 
-  revalidatePath("/admin/appointments");
-  revalidatePath("/reception/appointments");
-  revalidatePath("/doctor/appointments");
+  revalidateAppointments();
   return { ok: true, message: `Marked as ${status.toLowerCase().replace("_", " ")}.` };
 }
 
@@ -190,9 +196,6 @@ export async function rescheduleAppointmentAction(
     summary: `Rescheduled ${updated.patientName} with ${updated.doctorName} to ${input.date} ${input.time}`,
   });
 
-  revalidatePath("/admin/appointments");
-  revalidatePath("/reception/appointments");
-  revalidatePath("/doctor/appointments");
-  revalidatePath("/portal/appointments");
+  revalidateAppointments();
   return { ok: true, message: "Appointment rescheduled.", data: updated };
 }
