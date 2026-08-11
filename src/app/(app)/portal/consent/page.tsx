@@ -13,7 +13,7 @@ export default async function PortalConsentPage() {
   return (
     <div>
       <PageHeader title="Consent forms" description="Review and sign consent forms for your care." />
-      <ConsentView forms={forms} canSign />
+      <ConsentView forms={forms} canSign detailBasePath="/portal/consent" />
     </div>
   );
 }

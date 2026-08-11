@@ -29,7 +29,7 @@ export default async function AdminConsentPage() {
           ) : undefined
         }
       />
-      <ConsentView forms={consentForms} doctors={doctorOptions} />
+      <ConsentView forms={consentForms} doctors={doctorOptions} detailBasePath="/admin/consent" />
     </div>
   );
 }

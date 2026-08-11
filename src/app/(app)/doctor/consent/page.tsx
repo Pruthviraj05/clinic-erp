@@ -34,9 +34,11 @@ export default async function DoctorConsentPage() {
       <ConsentView
         forms={mine}
         canEdit={can(user.role, "consent", "edit")}
+        canDoctorSign={can(user.role, "consent", "edit")}
         doctors={doctorOptions}
         patientHistory={patientHistory}
         canAddRecords={can(user.role, "emr", "create")}
+        detailBasePath="/doctor/consent"
       />
     </div>
   );

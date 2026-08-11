@@ -39,6 +39,7 @@ export default async function ReceptionConsentPage() {
         forms={consentForms}
         canEdit={can(user.role, "consent", "edit")}
         doctors={doctorOptions}
+        detailBasePath="/reception/consent"
       />
     </div>
   );

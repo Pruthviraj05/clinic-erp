@@ -315,6 +315,60 @@ already been extracted above.
   in this pass (it touches the consult UI, not inventory) — flagging it here
   as a candidate for later, since it fits the "doctor perspective" gap.
 
+## 4d. Consent forms rebuilt as a proper letterhead document
+
+Previously a form was just a title, a free-text paragraph and a patient
+signature — nothing you could hand to an auditor or a lawyer and call
+complete. Redesigned around what real hospital consent forms actually carry.
+
+- **Letterhead print/PDF view** (`View / print` on every form, at
+  `/reception|doctor|portal|admin/consent/[id]`) — clinic name, address and
+  phone; the assigned doctor's name, qualifications and registration number;
+  a sequential form number (`CF-2026-000123`, from the same atomic-counter
+  pattern as invoice numbers — never a row count, which is racy and reuses
+  numbers when rows are deleted); patient name, age/sex, UHID and phone; an
+  allergy warning banner if the patient has one on file. The accent colour
+  reuses the doctor's own prescription branding (Rx Design), so a doctor's
+  consent forms and prescriptions read as one clinic's paperwork, not two.
+- **A real declaration**, not just the procedure text: a fixed legal-style
+  paragraph ("...has been explained to me in a language I understand... I am
+  giving this consent voluntarily...") plus a checklist — risks explained,
+  alternatives discussed, questions answered, interpreter used — ticked by
+  the doctor before the patient signs, and printed on the form either way so
+  it's visible whether it was actually gone through.
+- **The doctor signs too, separately from the patient.** Previously only the
+  patient's signature existed; there was no record the doctor actually gave
+  the explanation. "Countersign" is independent of the patient's status — a
+  doctor can sign before or after the patient, and it alone never marks the
+  form complete.
+- **A real decline path.** The type already had a `DECLINED` status but no
+  action ever set it — a patient who verbally refused had no way to have
+  that recorded; the form just sat there forever "pending". "Decline instead"
+  now closes it out with a required reason, shown on the printed form in
+  place of the signature blocks.
+- **A witness section** (name + relation), optional, for the cases — a minor,
+  a patient who can't sign, a disputed treatment — where clinics normally
+  want one.
+- **Categories** (Procedure / Treatment / Investigation / Data Privacy /
+  Other) replace the old free-floating preset buttons, each with a starting
+  template that's still fully editable — closer to how a hospital's form
+  register is organised than a flat list of past wordings.
+- A verification QR (same mechanism as the prescription QR) sits in the
+  footer, and the base64 signature images (patient, doctor, witness) are
+  excluded from list-view database reads the same way batch bill photos and
+  medical record files already are — only the detail page fetches the full
+  document, not the list.
+
+**One thing to know before you rely on this in production:** the 3 demo
+consent forms were updated with the new fields, and everything created going
+forward gets them automatically. But if front desk had already created *real*
+consent forms in the live database before this change, those older rows won't
+have a form number, category or checklist state yet — the print view will
+just show them blank/unset rather than fail. Opening and re-saving an old
+form (Edit → Save) backfills it. If there turn out to be many, say so and a
+one-off backfill script (like `scripts/backfill-batches.mjs` for inventory)
+is quick to add.
+
 ## 5. Performance and scale
 
 ### Done this session

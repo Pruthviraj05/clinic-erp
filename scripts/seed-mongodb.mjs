@@ -710,10 +710,13 @@ async function main() {
   const consentForms = [
     {
       id: "cf_seed_1",
+      formNo: "CF-2026-000001",
+      category: "TREATMENT",
       patientId: "pat_seed_1",
       patientName: "Sunita Deshmukh",
       doctorId: "doc_bhosikar",
       doctorName: DOCTOR_NAME,
+      branchId: "br_ravet",
       title: "Consent for DMARD Therapy (Methotrexate)",
       body:
         "I consent to starting disease-modifying therapy with Methotrexate for rheumatoid arthritis. " +
@@ -724,16 +727,23 @@ async function main() {
         "fever, unusual bleeding, breathlessness or persistent cough. I understand this medicine must not be " +
         "taken during pregnancy.",
       details: "Starting dose 7.5 mg once weekly. Baseline CBC, LFT, ESR and CRP done. Monitoring bloods every 4 weeks for the first 3 months.",
+      risksExplained: true,
+      alternativesDiscussed: true,
+      questionsAnswered: true,
+      interpreterUsed: false,
       status: "PENDING",
       createdBy: "Priya Kale",
       updatedAt: daysFromNow(-3, 12, 15),
     },
     {
       id: "cf_seed_2",
+      formNo: "CF-2026-000002",
+      category: "PROCEDURE",
       patientId: "pat_seed_2",
       patientName: "Ramesh Kulkarni",
       doctorId: "doc_bhosikar",
       doctorName: DOCTOR_NAME,
+      branchId: "br_ravet",
       title: "Consent for Intra-articular Steroid Injection",
       body:
         "I consent to an intra-articular corticosteroid injection into the affected joint for relief of acute " +
@@ -742,17 +752,25 @@ async function main() {
         "injection site, a short-term rise in blood sugar, and a small risk of joint infection. I confirm I have " +
         "no active infection and have disclosed all my current medications and allergies.",
       details: "Right first metatarsophalangeal joint. No anticoagulants. No known drug allergies. Procedure performed under aseptic precautions.",
+      risksExplained: true,
+      alternativesDiscussed: true,
+      questionsAnswered: true,
+      interpreterUsed: false,
       status: "SIGNED",
       signedAt: daysFromNow(-10, 16, 40),
+      doctorSignedAt: daysFromNow(-10, 16, 32),
       createdBy: "Priya Kale",
       updatedAt: daysFromNow(-10, 16, 40),
     },
     {
       id: "cf_seed_3",
+      formNo: "CF-2026-000003",
+      category: "INVESTIGATION",
       patientId: "pat_seed_3",
       patientName: "Anjali Joshi",
       doctorId: "doc_bhosikar",
       doctorName: DOCTOR_NAME,
+      branchId: "br_ravet",
       title: "Consent for Radiological Investigation (X-Ray LS Spine)",
       body:
         "I consent to an X-ray of the lumbosacral spine as advised for the evaluation of my low back pain. " +
@@ -760,6 +778,10 @@ async function main() {
         "ionising radiation. I confirm that I am not pregnant and am not likely to be pregnant. I understand the " +
         "report will be shared with my treating doctor and stored in my clinic record.",
       details: "AP and lateral views. Patient reports sulfa drug allergy — no contrast involved in this study.",
+      risksExplained: false,
+      alternativesDiscussed: false,
+      questionsAnswered: false,
+      interpreterUsed: false,
       status: "PENDING",
       createdBy: "Priya Kale",
       updatedAt: daysFromNow(-2, 10, 30),

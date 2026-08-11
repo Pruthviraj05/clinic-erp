@@ -36,7 +36,13 @@ function stripId<T>(doc: (T & { _id?: unknown }) | null): T | null {
  * be gigabytes. They are projected out of every multi-row read and fetched
  * only by `get(id)` on a detail screen.
  */
-const BLOB_FIELDS = ["billPhotoDataUrl", "fileDataUrl", "signatureDataUrl"];
+const BLOB_FIELDS = [
+  "billPhotoDataUrl",
+  "fileDataUrl",
+  "signatureDataUrl",
+  "doctorSignatureDataUrl",
+  "witnessSignatureDataUrl",
+];
 
 function blobProjection(): Record<string, 0> {
   return Object.fromEntries(BLOB_FIELDS.map((f) => [f, 0])) as Record<string, 0>;
