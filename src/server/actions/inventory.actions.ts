@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { newId } from "@/lib/ids";
 import { authorize } from "@/lib/guard";
 import { addMedicine, applyStockChange, lowStockItems, updateMedicine } from "@/server/demo/inventory-store";
-import { receiveStock } from "@/server/demo/batch-store";
+import { receiveStock, writeOffBatch } from "@/server/demo/batch-store";
 import { db } from "@/server/repositories";
 import { logAudit } from "@/server/demo/extra";
 import {
@@ -170,6 +170,35 @@ export async function receiveStockAction(
     ok: true,
     message: `Received ${totalUnits} unit(s) into batch ${input.batchNo}${input.freeQuantity ? ` (incl. ${input.freeQuantity} free)` : ""}.`,
   };
+}
+
+/**
+ * Write an expired or damaged lot off the shelf.
+ *
+ * Deliberately requires `delete` rights: this destroys stock value and cannot
+ * be undone from the UI, unlike a receipt or a dispense.
+ */
+export async function writeOffBatchAction(batchId: string, reason: string): Promise<ActionResult> {
+  const authz = await authorize("inventory", "delete");
+  if (!authz.ok) return authz;
+  const { session } = authz;
+
+  const trimmed = reason?.trim();
+  if (!trimmed) return { ok: false, message: "Give a reason for the write-off." };
+
+  const res = await writeOffBatch(batchId, trimmed, session.user.fullName);
+  if (!res.ok) return { ok: false, message: res.message };
+
+  await logAudit({
+    actor: session.user.fullName,
+    role: session.user.role,
+    action: "DELETE",
+    entity: "MedicineBatch",
+    summary: `Wrote off ${res.quantity} unit(s) worth ₹${res.valueAtCost} — ${trimmed}`,
+  });
+
+  revalidatePath("/admin/inventory");
+  return { ok: true, message: `${res.message} Loss at cost: ₹${res.valueAtCost}.` };
 }
 
 /** Packs print `MM/YYYY`; the medicine is usable to the last day of it. */

@@ -179,7 +179,14 @@ export interface Medicine {
   category: string | null;
   brand: string | null;
   unit: string;
+  /** Minimum — at or below this the item needs reordering. */
   reorderLevel: number;
+  /**
+   * Target level to restock up to. Without it there is no way to answer "how
+   * many should I order?" — only "should I order?". Falls back to 3× the
+   * reorder level when unset.
+   */
+  maxLevel?: number | null;
   /**
    * Total across all batches. Kept as a maintained aggregate so list screens
    * and low-stock checks stay a single read — `medicineBatches` is the

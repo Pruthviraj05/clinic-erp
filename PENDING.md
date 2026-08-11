@@ -260,9 +260,34 @@ between purchases.
   **schedule H/H1/X** (prescription-only classification under the Drugs and
   Cosmetics Rules) and **HSN code** for GST filing.
 
+**Second pass — the admin/inventory side of eVitalRx**
+
+- **Reorder list** (their "ShortBook"), the biggest operational gap. Answers
+  *how many to order*, not just *is it low*: every item at or below its
+  minimum, with a suggested quantity to restock up to the maximum, grouped by
+  the supplier we last bought it from, ranked by how soon it runs out.
+  Consumption is measured from the actual dispensing ledger over 90 days, so
+  a fast mover one unit below minimum outranks a slow one at zero. Selectable,
+  with a running cost total and an Excel export to send to the distributor.
+- **Minimum *and* maximum levels.** There was only a minimum, which can say
+  "order something" but never "order this many".
+- **Stock about to expire counts as unavailable** when deciding what to
+  reorder — 60 units expiring next week are not 60 units of cover.
+- **Write-off** for expired, damaged or recalled lots. Expiry was tracked but
+  there was no way to remove the stock, so expired medicine stayed both
+  dispensable and counted in stock value. Records the loss at cost against the
+  batch, and requires delete rights since it cannot be undone.
+- **Data-quality panel** — counts of medicines missing category, HSN code,
+  rack location, maximum level, purchase price or schedule classification,
+  each with why it matters. These only bite later (a missing HSN surfaces at
+  GST filing), so they need surfacing while still cheap to fix.
+
 Not copied from eVitalRx, deliberately: distributor ledgers, purchase orders,
-gate passes and e-invoicing are wholesale-pharmacy concerns and would be
-clutter in a single-doctor clinic.
+gate passes, warehouse transfers and e-invoicing are wholesale-pharmacy
+concerns and would be clutter in a single-doctor clinic.
+
+Not yet reviewed: their Reports section, which is behind an expired
+subscription on your account and could not be opened.
 
 ## 5. Performance and scale
 

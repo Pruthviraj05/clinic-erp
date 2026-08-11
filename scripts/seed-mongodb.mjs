@@ -454,6 +454,8 @@ async function main() {
     brand: null,
     unit,
     reorderLevel,
+    // Target level to restock up to — drives the reorder quantity.
+    maxLevel: reorderLevel * 5,
     stockQty,
     sellPrice,
     nearestExpiry: expiryInDays === null ? null : daysFromNow(expiryInDays),

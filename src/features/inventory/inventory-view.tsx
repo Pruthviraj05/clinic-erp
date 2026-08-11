@@ -23,6 +23,9 @@ import { AdjustStockDialog } from "./adjust-stock-dialog";
 import { EditMedicineDialog } from "./edit-medicine-dialog";
 import { ImportStockDialog } from "./import-stock-dialog";
 import { ReceiveStockDialog } from "./receive-stock-dialog";
+import { WriteOffDialog } from "./write-off-dialog";
+import { DataQualityPanel, ReorderView, WriteOffButton } from "./reorder-view";
+import type { ReorderSuggestion } from "@/server/demo/reorder-store";
 import { sendLowStockAlertAction, setMedicineActiveAction } from "@/server/actions/inventory.actions";
 import type { Medicine, MedicineBatch, StockMovementItem } from "@/types/domain";
 
@@ -146,6 +149,8 @@ export function InventoryView({
   medicines,
   movements,
   batches,
+  suggestions,
+  dataQuality,
   suppliers = [],
   canEdit = false,
   canDelete = false,
@@ -153,11 +158,14 @@ export function InventoryView({
   medicines: Medicine[];
   movements: StockMovementItem[];
   batches: MedicineBatch[];
+  suggestions: ReorderSuggestion[];
+  dataQuality: { key: string; label: string; count: number; why: string }[];
   suppliers?: string[];
   canEdit?: boolean;
   canDelete?: boolean;
 }) {
   const [tab, setTab] = useState("stock");
+  const [writingOff, setWritingOff] = useState<MedicineBatch | null>(null);
   const lowStock = useMemo(() => medicines.filter((m) => m.stockQty <= m.reorderLevel), [medicines]);
 
   /** Lots still holding stock, nearest expiry first — the FEFO pick order. */
@@ -354,21 +362,39 @@ export function InventoryView({
         header: "Received",
         cell: ({ row }) => <span className="text-sm whitespace-nowrap">{formatDate(row.original.receivedAt)}</span>,
       },
+      ...(canDelete
+        ? [
+            {
+              id: "writeOff",
+              header: "",
+              cell: ({ row }) => (
+                <WriteOffButton onClick={() => setWritingOff(row.original)} />
+              ),
+            } as ColumnDef<MedicineBatch>,
+          ]
+        : []),
     ],
-    [],
+    [canDelete],
   );
 
   return (
     <div className="space-y-4">
       <LowStockBanner items={lowStock} />
+      <WriteOffDialog batch={writingOff} onClose={() => setWritingOff(null)} />
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="stock">Stock ({medicines.length})</TabsTrigger>
+          <TabsTrigger value="reorder">Reorder ({suggestions.length})</TabsTrigger>
           <TabsTrigger value="batches">Batches ({liveBatches.length})</TabsTrigger>
           <TabsTrigger value="expiry">Expiry ({attention.length})</TabsTrigger>
           <TabsTrigger value="movements">Movements ({movements.length})</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="reorder" className="mt-4 space-y-4">
+          <DataQualityPanel issues={dataQuality} />
+          <ReorderView suggestions={suggestions} />
+        </TabsContent>
 
         <TabsContent value="stock" className="mt-4">
           <DataTable

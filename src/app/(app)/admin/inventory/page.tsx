@@ -3,6 +3,7 @@ import { Package, AlertTriangle, CalendarClock, IndianRupee } from "lucide-react
 import { requireRole } from "@/lib/guard";
 import { can } from "@/lib/rbac";
 import { db } from "@/server/repositories";
+import { dataQualityIssues, reorderSuggestions } from "@/server/demo/reorder-store";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
 import { InventoryView } from "@/features/inventory/inventory-view";
@@ -15,11 +16,13 @@ export default async function AdminInventoryPage() {
   const canEdit = can(session.user.role, "inventory", "edit");
   const canDelete = can(session.user.role, "inventory", "delete");
 
-  const [medicines, stockMovements, batches, supplierRows] = await Promise.all([
+  const [medicines, stockMovements, batches, supplierRows, suggestions, dataQuality] = await Promise.all([
     db.medicines.list(),
     db.stockMovements.list(),
     db.medicineBatches.list(),
     db.masters.suppliers.list((s) => s.active),
+    reorderSuggestions(),
+    dataQualityIssues(),
   ]);
 
   const lowStock = medicines.filter((m) => m.stockQty <= m.reorderLevel).length;
@@ -68,6 +71,8 @@ export default async function AdminInventoryPage() {
         medicines={medicines}
         movements={stockMovements}
         batches={batches}
+        suggestions={suggestions}
+        dataQuality={dataQuality.map(({ key, label, count, why }) => ({ key, label, count, why }))}
         suppliers={supplierRows.map((s) => s.name)}
         canEdit={canEdit}
         canDelete={canDelete}

@@ -210,6 +210,48 @@ export async function restoreDispense(
   await syncMedicineTotals(medicineId, by);
 }
 
+/**
+ * Write a lot off the shelf — expired, damaged or returned to the supplier.
+ *
+ * Expired stock must leave the count or it inflates both stock value and the
+ * reorder maths, and worse, remains dispensable. This zeroes the lot and
+ * records why, so the loss is visible rather than silently vanishing.
+ */
+export async function writeOffBatch(
+  batchId: string,
+  reason: string,
+  by: string,
+): Promise<{ ok: boolean; message: string; quantity?: number; valueAtCost?: number }> {
+  const batch = await db.medicineBatches.get(batchId);
+  if (!batch) return { ok: false, message: "Batch not found." };
+  if (batch.quantity <= 0) return { ok: false, message: "That batch is already empty." };
+
+  const quantity = batch.quantity;
+  const valueAtCost = Math.round(quantity * batch.costPrice * 100) / 100;
+
+  await db.medicineBatches.update(batchId, { quantity: 0 });
+  const balanceAfter = await syncMedicineTotals(batch.medicineId, by);
+
+  await db.stockMovements.insert({
+    id: newId("mv"),
+    medicineId: batch.medicineId,
+    medicineName: batch.medicineName,
+    // ADJUST rather than OUT: this stock was destroyed or returned, it was
+    // not dispensed, and the two must not be conflated in reporting.
+    type: "ADJUST",
+    quantity: -quantity,
+    balanceAfter,
+    reason,
+    by,
+    at: new Date().toISOString(),
+    batchId: batch.id,
+    batchNo: batch.batchNo,
+    expiry: batch.expiry,
+  });
+
+  return { ok: true, message: `Wrote off ${quantity} × ${batch.medicineName}.`, quantity, valueAtCost };
+}
+
 export interface ExpiryBucket {
   expired: MedicineBatch[];
   within30: MedicineBatch[];
