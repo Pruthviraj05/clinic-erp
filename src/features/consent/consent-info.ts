@@ -22,7 +22,7 @@ export async function consentInfoFor(form: ConsentFormItem): Promise<{
   const [branch, patient, design] = await Promise.all([
     branchId ? db.branches.get(branchId) : Promise.resolve(null),
     db.patients.get(form.patientId),
-    form.doctorId ? getRxDesignFor(form.doctorId) : Promise.resolve(null),
+    form.doctorId ? getRxDesignFor(form.doctorId, branchId) : Promise.resolve(null),
   ]);
 
   return {

@@ -19,7 +19,7 @@ export async function clinicInfoFor(rx: Prescription): Promise<{
     db.branches.get(rx.branchId),
     db.doctors.get(rx.doctorId),
     db.patients.get(rx.patientId),
-    getRxDesignFor(rx.doctorId),
+    getRxDesignFor(rx.doctorId, rx.branchId),
   ]);
 
   return {

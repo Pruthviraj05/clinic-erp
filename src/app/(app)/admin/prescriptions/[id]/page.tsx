@@ -31,7 +31,7 @@ export default async function AdminPrescriptionDetailPage({ params }: { params: 
         headerNote={design.headerNote}
         footerNote={design.footerNote}
         showQr={design.showQr}
-        showVitals={design.showVitals}
+        sections={design.sections}
         accentColor={design.accentColor}
         language={design.language}
       />

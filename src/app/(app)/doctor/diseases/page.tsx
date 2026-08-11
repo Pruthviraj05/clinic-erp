@@ -7,6 +7,7 @@ import { db } from "@/server/repositories";
 import { PageHeader } from "@/components/shared/page-header";
 import { SectionCard } from "@/components/shared/section-card";
 import { EmptyState } from "@/components/shared/empty-state";
+import { NewDiseaseListDialog } from "@/features/diseases/new-disease-list-dialog";
 import { formatAge, formatDate, humanizeEnum } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Disease lists" };
@@ -25,7 +26,8 @@ export default async function DoctorDiseasesPage() {
     <div>
       <PageHeader
         title="Disease lists"
-        description={`${groups.length} condition list(s) · ${totalTagged} patient(s) tagged. Add patients from the consult screen.`}
+        description={`${groups.length} condition list(s) · ${totalTagged} patient(s) tagged.`}
+        actions={<NewDiseaseListDialog />}
       />
 
       {groups.length === 0 ? (
@@ -33,7 +35,7 @@ export default async function DoctorDiseasesPage() {
           <EmptyState
             icon={Stethoscope}
             title="No disease lists yet"
-            description="Open a consultation and create a condition list to start grouping your patients."
+            description="Create a list here, or start one from any consultation."
           />
         </SectionCard>
       ) : (

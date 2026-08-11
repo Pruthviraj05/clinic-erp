@@ -15,7 +15,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { createAppointmentAction, type ActionResult } from "@/server/actions/appointment.actions";
-import { appointmentTypes } from "./constants";
+import { appointmentTypes, bookingSources, bookingSourceLabels } from "./constants";
 import { humanizeEnum } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -38,21 +38,32 @@ export function BookAppointmentDialog({
   doctors,
   patients,
   defaultBranchId,
+  defaultDate,
   triggerLabel = "Book appointment",
   fixedPatient,
   defaultOpen = false,
+  open: openProp,
+  onOpenChange,
 }: {
   branches: RefOption[];
   doctors: RefOption[];
   patients: RefOption[];
   defaultBranchId?: string;
+  /** Pre-fill the date field, e.g. YYYY-MM-DD from a clicked calendar day. */
+  defaultDate?: string;
   triggerLabel?: string;
   /** Pin the patient (patient portal self-booking) — hides the patient select. */
   fixedPatient?: RefOption;
   /** Open on mount (e.g. arriving via “Book appointment” deep link). */
   defaultOpen?: boolean;
+  /** Controlled mode (e.g. opened from a calendar day click) — omit both to use the built-in trigger. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const isControlled = openProp !== undefined;
+  const [selfOpen, setSelfOpen] = useState(defaultOpen);
+  const open = isControlled ? openProp : selfOpen;
+  const setOpen = isControlled ? (onOpenChange ?? (() => {})) : setSelfOpen;
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
     createAppointmentAction,
     null,
@@ -68,15 +79,18 @@ export function BookAppointmentDialog({
     } else if (state.message) {
       toast.error(state.message);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
   const err = (f: string) => state?.fieldErrors?.[f]?.[0];
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className={buttonVariants({ size: "lg", className: "h-9 shrink-0" })}>
-        <CalendarPlus className="size-4" /> {triggerLabel}
-      </DialogTrigger>
+      {!isControlled && (
+        <DialogTrigger className={buttonVariants({ size: "lg", className: "h-9 shrink-0" })}>
+          <CalendarPlus className="size-4" /> {triggerLabel}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Book appointment</DialogTitle>
@@ -132,7 +146,7 @@ export function BookAppointmentDialog({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="grid gap-2">
               <Label htmlFor="date">Date</Label>
-              <input id="date" name="date" type="date" defaultValue={todayStr()} className={fieldClass} />
+              <input id="date" name="date" type="date" defaultValue={defaultDate ?? todayStr()} className={fieldClass} />
               {err("date") && <p className="text-xs text-destructive">{err("date")}</p>}
             </div>
             <div className="grid gap-2">
@@ -163,6 +177,20 @@ export function BookAppointmentDialog({
               <Label htmlFor="reason">Reason</Label>
               <input id="reason" name="reason" placeholder="e.g. Follow-up" className={fieldClass} />
             </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="source">How was this booked?</Label>
+            {fixedPatient ? (
+              // Portal self-booking is always the website — no reason to ask.
+              <input type="hidden" name="source" value="WEBSITE" />
+            ) : (
+              <select id="source" name="source" className={fieldClass} defaultValue="WALK_IN">
+                {bookingSources.map((s) => (
+                  <option key={s} value={s}>{bookingSourceLabels[s]}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           <DialogFooter className={cn("mt-2")}>

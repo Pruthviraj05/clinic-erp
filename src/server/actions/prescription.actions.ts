@@ -6,7 +6,7 @@ import { z } from "zod";
 import { authorize } from "@/lib/guard";
 import { db } from "@/server/repositories";
 import { addRxTemplate } from "@/server/demo/template-store";
-import { RX_ACCENTS, type RxDesign } from "@/server/demo/rx-design-store";
+import { RX_ACCENTS, rxDesignKey, DEFAULT_RX_SECTION_ORDER, type RxDesign } from "@/server/demo/rx-design-store";
 import { logAudit } from "@/server/demo/extra";
 import type { Prescription } from "@/types/domain";
 import type { ActionResult } from "./appointment.actions";
@@ -198,15 +198,18 @@ export async function updatePrescriptionAction(
 }
 
 const rxDesignSchema = z.object({
+  branchId: z.string().optional(),
   headerNote: z.string().max(200),
   footerNote: z.string().max(500),
   accentColor: z.string().refine((c) => RX_ACCENTS.includes(c), "Pick one of the offered colours"),
   language: z.enum(["en", "mr", "both"]),
   showQr: z.boolean(),
-  showVitals: z.boolean(),
+  sections: z
+    .array(z.object({ key: z.enum(DEFAULT_RX_SECTION_ORDER as [string, ...string[]]), visible: z.boolean() }))
+    .min(1),
 });
 
-/** Save the doctor's personal prescription design (header/footer/accent/language). */
+/** Save the doctor's prescription design — their default, or a branch-specific override. */
 export async function saveRxDesignAction(
   payload: z.infer<typeof rxDesignSchema>,
 ): Promise<ActionResult<RxDesign>> {
@@ -219,11 +222,20 @@ export async function saveRxDesignAction(
 
   const parsed = rxDesignSchema.safeParse(payload);
   if (!parsed.success) return { ok: false, message: "Design could not be validated." };
+  const { branchId, ...rest } = parsed.data;
 
   const doctorId = user.role === "DOCTOR" ? user.linkId! : user.id;
-  const existing = await db.rxDesigns.get(doctorId);
-  const design = { id: doctorId, doctorId, ...parsed.data };
-  if (existing) await db.rxDesigns.update(doctorId, design);
+  const key = rxDesignKey(doctorId, branchId);
+  const existing = await db.rxDesigns.get(key);
+  const design: RxDesign & { id: string } = {
+    id: key,
+    doctorId,
+    branchId,
+    showVitals: rest.sections.find((s) => s.key === "vitals")?.visible ?? true,
+    ...rest,
+    sections: rest.sections as RxDesign["sections"],
+  };
+  if (existing) await db.rxDesigns.update(key, design);
   else await db.rxDesigns.insert(design);
 
   await logAudit({
@@ -231,7 +243,7 @@ export async function saveRxDesignAction(
     role: user.role,
     action: "UPDATE",
     entity: "RxDesign",
-    summary: "Updated personal prescription design",
+    summary: `Updated prescription design${branchId ? " for one branch" : ""}`,
   });
   revalidatePath("/doctor/rx-design");
   revalidatePath("/doctor/prescriptions");

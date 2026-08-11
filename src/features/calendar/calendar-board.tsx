@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatTime } from "@/lib/format";
+import { BookAppointmentDialog, type RefOption } from "@/features/appointments/book-appointment-dialog";
 import type { Appointment } from "@/types/domain";
 
 const STATUS_DOT: Record<string, string> = {
@@ -32,12 +33,24 @@ function startOfWeek(d: Date) {
 export function CalendarBoard({
   appointments,
   todayIso,
+  canBook = false,
+  branches = [],
+  doctors = [],
+  patients = [],
+  defaultBranchId,
 }: {
   appointments: Appointment[];
   todayIso: string;
+  /** Click a day to schedule directly from the calendar (admin/reception only — doctors can't create bookings). */
+  canBook?: boolean;
+  branches?: RefOption[];
+  doctors?: RefOption[];
+  patients?: RefOption[];
+  defaultBranchId?: string;
 }) {
   const [view, setView] = useState<"month" | "week">("month");
   const [cursor, setCursor] = useState<string>(todayIso);
+  const [bookingDate, setBookingDate] = useState<string | null>(null);
   const todayKey = ymd(new Date(todayIso));
 
   const byDay = useMemo(() => {
@@ -136,16 +149,30 @@ export function CalendarBoard({
               return (
                 <div
                   key={cell.key}
+                  role={canBook ? "button" : undefined}
+                  tabIndex={canBook ? 0 : undefined}
+                  onClick={canBook ? () => setBookingDate(cell.key) : undefined}
+                  onKeyDown={
+                    canBook
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setBookingDate(cell.key); }
+                        }
+                      : undefined
+                  }
                   className={cn(
-                    "border-b border-r p-1.5 first:border-l",
+                    "group relative border-b border-r p-1.5 first:border-l",
                     view === "month" ? "min-h-[104px]" : "min-h-[420px] align-top",
                     !cell.inMonth && "bg-muted/30 text-muted-foreground",
+                    canBook && "cursor-pointer hover:bg-muted/40",
                   )}
                 >
-                  <div className="mb-1 flex justify-end">
+                  <div className="mb-1 flex items-center justify-between">
+                    {canBook && (
+                      <Plus className="size-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                    )}
                     <span
                       className={cn(
-                        "flex size-6 items-center justify-center rounded-full text-xs font-medium",
+                        "ml-auto flex size-6 items-center justify-center rounded-full text-xs font-medium",
                         isToday && "bg-primary text-primary-foreground",
                       )}
                     >
@@ -170,6 +197,19 @@ export function CalendarBoard({
           </div>
         </div>
       </div>
+
+      {canBook && bookingDate && (
+        <BookAppointmentDialog
+          key={bookingDate}
+          branches={branches}
+          doctors={doctors}
+          patients={patients}
+          defaultBranchId={defaultBranchId}
+          defaultDate={bookingDate}
+          open
+          onOpenChange={(o) => { if (!o) setBookingDate(null); }}
+        />
+      )}
     </div>
   );
 }

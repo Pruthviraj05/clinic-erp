@@ -10,6 +10,20 @@ import { rxLabel, rxTiming, RX_LANG_OPTIONS, type RxLang } from "@/lib/rx-labels
 import { cn } from "@/lib/utils";
 import type { Prescription } from "@/types/domain";
 
+/**
+ * Mirrors `RxSectionKey`/`RxSectionConfig` in `server/demo/rx-design-store.ts`
+ * — duplicated (not imported) because that module pulls in server-only `db`
+ * access and this is a client component.
+ */
+export type RxSectionKey = "vitals" | "symptoms" | "diagnosis" | "medicines" | "investigations" | "advice" | "followUp";
+export interface RxSectionConfig {
+  key: RxSectionKey;
+  visible: boolean;
+}
+const DEFAULT_SECTIONS: RxSectionConfig[] = (
+  ["vitals", "symptoms", "diagnosis", "medicines", "investigations", "advice", "followUp"] as RxSectionKey[]
+).map((key) => ({ key, visible: true }));
+
 export interface ClinicInfo {
   name: string;
   address: string;
@@ -39,7 +53,7 @@ export function PrescriptionDetail({
   headerNote,
   footerNote,
   showQr = true,
-  showVitals = true,
+  sections = DEFAULT_SECTIONS,
   accentColor = "#0f766e",
   language = "en",
   patient,
@@ -52,7 +66,8 @@ export function PrescriptionDetail({
   headerNote?: string;
   footerNote?: string;
   showQr?: boolean;
-  showVitals?: boolean;
+  /** Order and visibility of each content block — from the doctor's Rx Design. */
+  sections?: RxSectionConfig[];
   accentColor?: string;
   language?: RxLang;
   patient?: RxPatientInfo;
@@ -157,81 +172,89 @@ export function PrescriptionDetail({
             </p>
           ) : null}
 
-          {/* Vitals */}
-          {showVitals && vitalItems.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 border-y py-2.5 text-sm">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{L("vitals")}</span>
-              {vitalItems.map(([k, v]) => (
-                <span key={k as string}>
-                  <span className="text-muted-foreground">{k}: </span>
-                  <span className="font-medium">{v}</span>
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Symptoms & diagnosis */}
-          <div className="grid gap-4 border-b py-4 sm:grid-cols-2">
-            <Block title={L("symptoms")} text={rx.symptoms} />
-            <Block title={L("diagnosis")} text={rx.diagnoses.join(", ")} accent={accentColor} />
+          {/* Content blocks — order and visibility come from the doctor's Rx Design. */}
+          <div className="divide-y border-t">
+            {sections
+              .filter((s) => s.visible)
+              .map((s) => {
+                const node = (() => {
+                  switch (s.key) {
+                    case "vitals":
+                      return vitalItems.length > 0 ? (
+                        <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{L("vitals")}</span>
+                          {vitalItems.map(([k, v]) => (
+                            <span key={k as string}>
+                              <span className="text-muted-foreground">{k}: </span>
+                              <span className="font-medium">{v}</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : null;
+                    case "symptoms":
+                      return rx.symptoms ? <Block title={L("symptoms")} text={rx.symptoms} /> : null;
+                    case "diagnosis":
+                      return rx.diagnoses.length > 0 ? (
+                        <Block title={L("diagnosis")} text={rx.diagnoses.join(", ")} accent={accentColor} />
+                      ) : null;
+                    case "medicines":
+                      return (
+                        <div>
+                          <div className="mb-3 flex items-center gap-2">
+                            <span className="font-serif text-2xl font-bold italic" style={{ color: accentColor }}>℞</span>
+                            <span className="text-sm font-medium uppercase tracking-wide text-muted-foreground">{L("medications")}</span>
+                          </div>
+                          <div className="overflow-x-auto scrollbar-thin">
+                            <table className="w-full min-w-[560px] text-sm">
+                              <thead>
+                                <tr className="border-b text-left text-xs uppercase text-muted-foreground">
+                                  <th className="pb-2 font-medium">#</th>
+                                  <th className="pb-2 font-medium">{L("medicine")}</th>
+                                  <th className="pb-2 font-medium">{L("dosage")}</th>
+                                  <th className="pb-2 font-medium">{L("frequency")}</th>
+                                  <th className="pb-2 font-medium">{L("duration")}</th>
+                                  <th className="pb-2 font-medium">{L("instructions")}</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {rx.medicines.map((m, i) => (
+                                  <tr key={i} className="border-b last:border-0 align-top">
+                                    <td className="py-2.5 text-muted-foreground">{i + 1}</td>
+                                    <td className="py-2.5 font-medium">{m.name}</td>
+                                    <td className="py-2.5">{m.dosage ?? "—"}</td>
+                                    <td className="py-2.5">
+                                      <span className="font-mono">{m.frequency ?? "—"}</span>
+                                      {m.timing ? <span className="text-muted-foreground"> ({rxTiming(m.timing, lang)})</span> : ""}
+                                    </td>
+                                    <td className="py-2.5">{m.durationDays ? `${m.durationDays} ${L("days")}` : "—"}</td>
+                                    <td className="py-2.5 text-muted-foreground">{m.instructions ?? "—"}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    case "investigations":
+                      return rx.investigations.length > 0 ? (
+                        <Block title={L("investigations")} text={rx.investigations.join(", ")} />
+                      ) : null;
+                    case "advice":
+                      return rx.advice ? <Block title={L("advice")} text={rx.advice} /> : null;
+                    case "followUp":
+                      return rx.followUpDate ? (
+                        <div>
+                          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{L("followUp")}</p>
+                          <p className="text-sm font-semibold" style={{ color: accentColor }}>{formatDate(rx.followUpDate)}</p>
+                        </div>
+                      ) : null;
+                    default:
+                      return null;
+                  }
+                })();
+                return node ? <div key={s.key} className="py-4">{node}</div> : null;
+              })}
           </div>
-
-          {/* Rx medicines */}
-          <div className="py-4">
-            <div className="mb-3 flex items-center gap-2">
-              <span className="font-serif text-2xl font-bold italic" style={{ color: accentColor }}>℞</span>
-              <span className="text-sm font-medium uppercase tracking-wide text-muted-foreground">{L("medications")}</span>
-            </div>
-            <div className="overflow-x-auto scrollbar-thin">
-              <table className="w-full min-w-[560px] text-sm">
-                <thead>
-                  <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                    <th className="pb-2 font-medium">#</th>
-                    <th className="pb-2 font-medium">{L("medicine")}</th>
-                    <th className="pb-2 font-medium">{L("dosage")}</th>
-                    <th className="pb-2 font-medium">{L("frequency")}</th>
-                    <th className="pb-2 font-medium">{L("duration")}</th>
-                    <th className="pb-2 font-medium">{L("instructions")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rx.medicines.map((m, i) => (
-                    <tr key={i} className="border-b last:border-0 align-top">
-                      <td className="py-2.5 text-muted-foreground">{i + 1}</td>
-                      <td className="py-2.5 font-medium">{m.name}</td>
-                      <td className="py-2.5">{m.dosage ?? "—"}</td>
-                      <td className="py-2.5">
-                        <span className="font-mono">{m.frequency ?? "—"}</span>
-                        {m.timing ? <span className="text-muted-foreground"> ({rxTiming(m.timing, lang)})</span> : ""}
-                      </td>
-                      <td className="py-2.5">{m.durationDays ? `${m.durationDays} ${L("days")}` : "—"}</td>
-                      <td className="py-2.5 text-muted-foreground">{m.instructions ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Investigations */}
-          {rx.investigations.length > 0 && (
-            <div className="border-t py-4">
-              <Block title={L("investigations")} text={rx.investigations.join(", ")} />
-            </div>
-          )}
-
-          {/* Advice + follow-up */}
-          {(rx.advice || rx.followUpDate) && (
-            <div className="grid gap-4 border-t py-4 sm:grid-cols-2">
-              {rx.advice ? <Block title={L("advice")} text={rx.advice} /> : <div />}
-              {rx.followUpDate ? (
-                <div className="sm:text-right">
-                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{L("followUp")}</p>
-                  <p className="text-sm font-semibold" style={{ color: accentColor }}>{formatDate(rx.followUpDate)}</p>
-                </div>
-              ) : null}
-            </div>
-          )}
 
           {/* Footer: QR + signature */}
           <div className="flex flex-wrap items-end justify-between gap-4 border-t pt-5">

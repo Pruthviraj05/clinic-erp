@@ -18,3 +18,26 @@ export async function exportToExcel(
   XLSX.utils.book_append_sheet(workbook, worksheet, sheetName.slice(0, 31));
   XLSX.writeFile(workbook, `${fileName}.xlsx`);
 }
+
+/** Escapes a value for a CSV cell — wraps in quotes whenever it contains a comma, quote or newline. */
+function csvCell(value: unknown): string {
+  const s = value === null || value === undefined ? "" : String(value);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/** Export an array of flat records to a real .csv file (client-side download). No dependency needed. */
+export function exportToCsv(rows: Record<string, unknown>[], fileName: string) {
+  if (rows.length === 0) return;
+  const headers = Object.keys(rows[0]);
+  const lines = [
+    headers.map(csvCell).join(","),
+    ...rows.map((r) => headers.map((h) => csvCell(r[h])).join(",")),
+  ];
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${fileName}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}

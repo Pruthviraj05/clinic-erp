@@ -8,6 +8,7 @@ import { db } from "@/server/repositories";
 import { logAudit } from "@/server/demo/extra";
 import { PHARMACY_GST_RATE, round2 } from "@/lib/billing-rates";
 import { commitDispense, planDispense, restoreDispense, type DispenseLine } from "@/server/demo/batch-store";
+import { BILL_ACCENTS, type BillDesign, type BillKind } from "@/server/demo/bill-design-store";
 import type { Invoice, InvoiceItem } from "@/types/domain";
 import type { ActionResult } from "./appointment.actions";
 
@@ -137,6 +138,7 @@ export async function createPharmacyBillAction(
     branchId: payload.branchId,
     patientId: patient.id,
     patientName: patient.fullName,
+    invoiceKind: "PHARMACY",
     status: "PAID",
     paymentStatus: "PAID",
     items: lineItems,
@@ -208,6 +210,7 @@ export async function createConsultationInvoiceAction(
     branchId: branch.id,
     patientId: patient.id,
     patientName: patient.fullName,
+    invoiceKind: "CONSULTATION",
     status: paid ? "PAID" : "ISSUED",
     paymentStatus: paid ? "PAID" : "UNPAID",
     items: [
@@ -298,4 +301,46 @@ export async function recordPaymentAction(
       : `₹${amount} recorded — ₹${updated.balanceAmount} outstanding.`,
     data: updated,
   };
+}
+
+const billDesignSchema = z.object({
+  kind: z.enum(["PHARMACY", "CONSULTATION"]),
+  documentTitle: z.string().trim().min(2).max(60),
+  headerNote: z.string().max(200),
+  footerNote: z.string().max(500),
+  accentColor: z.string().refine((c) => BILL_ACCENTS.includes(c), "Pick one of the offered colours"),
+});
+
+/**
+ * Save the letterhead for pharmacy bills or payment invoices — a clinic-wide
+ * setting, not per-doctor, so only admins manage it (front desk prints these,
+ * but doesn't redesign them).
+ */
+export async function saveBillDesignAction(
+  payload: z.infer<typeof billDesignSchema>,
+): Promise<ActionResult<BillDesign>> {
+  const authz = await authorize("settings", "edit");
+  if (!authz.ok) return authz;
+  const { user } = authz.session;
+
+  const parsed = billDesignSchema.safeParse(payload);
+  if (!parsed.success) return { ok: false, message: "Design could not be validated." };
+
+  const { kind, ...rest } = parsed.data;
+  const existing = await db.billDesigns.get(kind);
+  const design: BillDesign & { id: string } = { id: kind, kind: kind as BillKind, ...rest };
+  if (existing) await db.billDesigns.update(kind, design);
+  else await db.billDesigns.insert(design);
+
+  await logAudit({
+    actor: user.fullName,
+    role: user.role,
+    action: "UPDATE",
+    entity: "BillDesign",
+    summary: `Updated the ${kind === "PHARMACY" ? "pharmacy bill" : "payment invoice"} letterhead`,
+  });
+  revalidatePath("/admin/settings");
+  revalidatePath("/admin/billing");
+  revalidatePath("/reception/billing");
+  return { ok: true, message: "Bill design saved.", data: design };
 }

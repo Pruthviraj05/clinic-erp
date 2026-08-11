@@ -2,14 +2,20 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { MessageSquare, Mail, Building2, Bell, FileText, Loader2 } from "lucide-react";
+import { MessageSquare, Mail, Building2, Bell, FileText, Receipt, Loader2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { SectionCard } from "@/components/shared/section-card";
 import { savePrescriptionTemplateAction } from "@/server/actions/settings.actions";
+import { BillDesignForm } from "./bill-design-form";
 import type { PrescriptionTemplate } from "@/server/demo/settings-store";
+import type { BillDesign } from "@/server/demo/bill-design-store";
+
+// Mirrors BILL_ACCENTS in server/demo/bill-design-store.ts — duplicated (not
+// imported) because that module pulls in server-only `db` access.
+const BILL_ACCENTS = ["#0f766e", "#1d4ed8", "#7c3aed", "#be123c", "#b45309", "#166534"];
 
 const fieldClass =
   "h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
@@ -35,7 +41,15 @@ function ToggleRow({ label, desc, defaultChecked }: { label: string; desc: strin
   );
 }
 
-export function SettingsView({ rxTemplate }: { rxTemplate: PrescriptionTemplate }) {
+export function SettingsView({
+  rxTemplate,
+  pharmacyDesign,
+  consultationDesign,
+}: {
+  rxTemplate: PrescriptionTemplate;
+  pharmacyDesign: BillDesign;
+  consultationDesign: BillDesign;
+}) {
   const save = (what: string) => toast.success(`${what} settings saved (demo)`);
 
   const [header, setHeader] = useState(rxTemplate.headerNote);
@@ -57,6 +71,7 @@ export function SettingsView({ rxTemplate }: { rxTemplate: PrescriptionTemplate 
       <TabsList>
         <TabsTrigger value="general"><Building2 className="size-4" /> General</TabsTrigger>
         <TabsTrigger value="prescription"><FileText className="size-4" /> Prescription</TabsTrigger>
+        <TabsTrigger value="billing"><Receipt className="size-4" /> Billing</TabsTrigger>
         <TabsTrigger value="whatsapp"><MessageSquare className="size-4" /> WhatsApp</TabsTrigger>
         <TabsTrigger value="email"><Mail className="size-4" /> Email</TabsTrigger>
         <TabsTrigger value="notifications"><Bell className="size-4" /> Notifications</TabsTrigger>
@@ -125,6 +140,15 @@ export function SettingsView({ rxTemplate }: { rxTemplate: PrescriptionTemplate 
               {pending && <Loader2 className="size-4 animate-spin" />} Save template
             </Button>
           </div>
+        </SectionCard>
+      </TabsContent>
+
+      <TabsContent value="billing" className="mt-4">
+        <SectionCard
+          title="Bill letterheads"
+          description="Pharmacy bills and payment invoices print with their own design — the front desk prints them, but only admins design them."
+        >
+          <BillDesignForm pharmacyDesign={pharmacyDesign} consultationDesign={consultationDesign} accents={BILL_ACCENTS} />
         </SectionCard>
       </TabsContent>
 

@@ -22,6 +22,7 @@ import {
 import { BookAppointmentDialog, type RefOption } from "./book-appointment-dialog";
 import { RescheduleDialog } from "./reschedule-dialog";
 import { updateAppointmentStatusAction } from "@/server/actions/appointment.actions";
+import { bookingSourceLabels } from "./constants";
 import { formatDate, formatTime, humanizeEnum, initials } from "@/lib/format";
 import type { Appointment, AppointmentStatus } from "@/types/domain";
 
@@ -147,6 +148,15 @@ export function AppointmentsView({
         cell: ({ row }) => <span className="text-sm">{humanizeEnum(row.original.type)}</span>,
       },
       {
+        accessorKey: "source",
+        header: "Source",
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">
+            {row.original.source ? bookingSourceLabels[row.original.source] : "Walk-in"}
+          </span>
+        ),
+      },
+      {
         accessorKey: "status",
         header: "Status",
         cell: ({ row }) => <StatusBadge status={row.original.status} />,
@@ -228,6 +238,7 @@ export function AppointmentsView({
         Doctor: a.doctorName,
         Branch: a.branchName,
         Type: humanizeEnum(a.type),
+        Source: a.source ? bookingSourceLabels[a.source] : "Walk-in",
         Status: humanizeEnum(a.status),
         Payment: humanizeEnum(a.paymentStatus),
         Reason: a.reason ?? "",

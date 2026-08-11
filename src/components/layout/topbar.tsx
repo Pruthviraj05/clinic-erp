@@ -120,7 +120,7 @@ export function Topbar({ name, email, role, branchName, notificationCount = 0, o
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem render={<Link href="/profile" />}>
               <UserRound className="size-4" /> Profile
             </DropdownMenuItem>
             <DropdownMenuSeparator />

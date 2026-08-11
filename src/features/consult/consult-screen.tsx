@@ -40,7 +40,7 @@ import { createDiseaseGroupAction, setPatientInGroupAction } from "@/server/acti
 import { formatAge, formatDate, humanizeEnum } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { RxTemplate } from "@/server/demo/template-store";
-import type { PrescriptionTemplate } from "@/server/demo/settings-store";
+import type { RxDesign } from "@/server/demo/rx-design-store";
 import type { ClinicHeader } from "@/lib/clinic";
 import type { Appointment, Patient, Prescription, PrescriptionMedicine } from "@/types/domain";
 
@@ -111,7 +111,7 @@ export function ConsultScreen({
   investigationSuggestions,
   clinic,
   doctorMeta,
-  rxSettings,
+  rxDesign,
   diseaseGroups = [],
   prefill,
 }: {
@@ -124,7 +124,7 @@ export function ConsultScreen({
   investigationSuggestions: string[];
   clinic: ClinicHeader;
   doctorMeta?: string;
-  rxSettings: PrescriptionTemplate;
+  rxDesign: RxDesign;
   /** Doctor's disease lists — patient can be added to one mid-consult. */
   diseaseGroups?: DiseaseGroupOption[];
   /** Present = editing an existing prescription instead of creating one. */
@@ -158,13 +158,56 @@ export function ConsultScreen({
 
   const drugNames = useMemo(() => drugOptions.map((d) => d.name), [drugOptions]);
 
+  // What each currently-applied template actually added, so a double-click can
+  // remove exactly that — not anything the doctor typed manually, and not
+  // values another still-applied template also needs.
+  const [appliedTemplates, setAppliedTemplates] = useState<
+    Record<string, { diagnoses: string[]; medicineRefs: PrescriptionMedicine[]; advice: string[]; investigations: string[]; followUpValue: string | null }>
+  >({});
+
   function applyTemplate(tpl: RxTemplate) {
+    if (appliedTemplates[tpl.id]) return; // already applied — single click doesn't re-apply
+    const medicineRefs = tpl.medicines.map((x) => ({ ...x }));
     setDiagnoses((d) => [...new Set([...d, ...tpl.diagnoses])]);
-    setMedicines((m) => [...m, ...tpl.medicines.map((x) => ({ ...x }))]);
+    setMedicines((m) => [...m, ...medicineRefs]);
     setAdvice((a) => [...new Set([...a, ...tpl.advice])]);
     setInvestigations((i) => [...new Set([...i, ...tpl.investigations])]);
-    if (tpl.followUpDays && !followUpDate) setFollowUpDate(ymdFromNow(tpl.followUpDays));
+    let followUpValue: string | null = null;
+    if (tpl.followUpDays && !followUpDate) {
+      followUpValue = ymdFromNow(tpl.followUpDays);
+      setFollowUpDate(followUpValue);
+    }
+    setAppliedTemplates((m) => ({
+      ...m,
+      [tpl.id]: { diagnoses: tpl.diagnoses, medicineRefs, advice: tpl.advice, investigations: tpl.investigations, followUpValue },
+    }));
     toast.success(`Applied “${tpl.name}”`);
+  }
+
+  function removeTemplate(tpl: RxTemplate) {
+    const applied = appliedTemplates[tpl.id];
+    if (!applied) return;
+    const stillNeeded = (field: "diagnoses" | "advice" | "investigations") =>
+      new Set(
+        Object.entries(appliedTemplates)
+          .filter(([id]) => id !== tpl.id)
+          .flatMap(([, v]) => v[field]),
+      );
+    const keepDiagnoses = stillNeeded("diagnoses");
+    const keepAdvice = stillNeeded("advice");
+    const keepInvestigations = stillNeeded("investigations");
+
+    setDiagnoses((d) => d.filter((v) => !applied.diagnoses.includes(v) || keepDiagnoses.has(v)));
+    setAdvice((a) => a.filter((v) => !applied.advice.includes(v) || keepAdvice.has(v)));
+    setInvestigations((i) => i.filter((v) => !applied.investigations.includes(v) || keepInvestigations.has(v)));
+    setMedicines((m) => m.filter((med) => !applied.medicineRefs.includes(med)));
+    setFollowUpDate((f) => (applied.followUpValue && f === applied.followUpValue ? "" : f));
+    setAppliedTemplates((m) => {
+      const next = { ...m };
+      delete next[tpl.id];
+      return next;
+    });
+    toast.success(`Removed “${tpl.name}”`);
   }
 
   function repeatVisit(rx: Prescription) {
@@ -314,11 +357,23 @@ export function ConsultScreen({
         <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           <Zap className="size-3.5" /> Quick start
         </span>
-        {quickTemplates.map((tpl) => (
-          <Button key={tpl.id} type="button" variant="outline" size="sm" onClick={() => applyTemplate(tpl)}>
-            {tpl.name}
-          </Button>
-        ))}
+        {quickTemplates.map((tpl) => {
+          const applied = !!appliedTemplates[tpl.id];
+          return (
+            <Button
+              key={tpl.id}
+              type="button"
+              variant={applied ? "secondary" : "outline"}
+              size="sm"
+              title={applied ? "Double-click to remove" : "Click to apply"}
+              className={applied ? "border-primary/50" : undefined}
+              onClick={() => applyTemplate(tpl)}
+              onDoubleClick={() => removeTemplate(tpl)}
+            >
+              {tpl.name}
+            </Button>
+          );
+        })}
         {templates.length > quickTemplates.length && (
           <Button type="button" variant="ghost" size="sm" onClick={() => setAllTemplatesOpen(true)}>
             All templates
@@ -526,13 +581,14 @@ export function ConsultScreen({
               patient={patient}
               vitals={vitals}
               complaints={complaints}
+              notes={notes}
               diagnoses={diagnoses}
               medicines={medicines.filter((m) => m.name.trim())}
               investigations={investigations}
               advice={advice}
               followUpDate={followUpDate}
               letterhead={letterhead}
-              rxSettings={rxSettings}
+              design={rxDesign}
             />
           </div>
         </div>
@@ -576,25 +632,31 @@ export function ConsultScreen({
             <DialogDescription>Apply a starter — it merges into the current consultation.</DialogDescription>
           </DialogHeader>
           <ul className="max-h-80 space-y-1 overflow-y-auto">
-            {templates.map((tpl) => (
-              <li key={tpl.id}>
-                <button
-                  type="button"
-                  className="w-full rounded-lg border px-3 py-2 text-left hover:bg-muted/50"
-                  onClick={() => {
-                    applyTemplate(tpl);
-                    setAllTemplatesOpen(false);
-                  }}
-                >
-                  <p className="text-sm font-medium">{tpl.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {[tpl.diagnoses.join(", "), tpl.medicines.map((m) => m.name).join(", ")]
-                      .filter(Boolean)
-                      .join(" · ") || "Empty template"}
-                  </p>
-                </button>
-              </li>
-            ))}
+            {templates.map((tpl) => {
+              const applied = !!appliedTemplates[tpl.id];
+              return (
+                <li key={tpl.id}>
+                  <button
+                    type="button"
+                    className="w-full rounded-lg border px-3 py-2 text-left hover:bg-muted/50"
+                    onClick={() => {
+                      applyTemplate(tpl);
+                      setAllTemplatesOpen(false);
+                    }}
+                  >
+                    <p className="flex items-center gap-1.5 text-sm font-medium">
+                      {tpl.name}
+                      {applied && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-normal text-primary">Applied</span>}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {[tpl.diagnoses.join(", "), tpl.medicines.map((m) => m.name).join(", ")]
+                        .filter(Boolean)
+                        .join(" · ") || "Empty template"}
+                    </p>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </DialogContent>
       </Dialog>
@@ -866,13 +928,14 @@ function RxPreview({
   patient,
   vitals,
   complaints,
+  notes,
   diagnoses,
   medicines,
   investigations,
   advice,
   followUpDate,
   letterhead,
-  rxSettings,
+  design,
 }: {
   clinic: ClinicHeader;
   doctorName: string;
@@ -880,14 +943,16 @@ function RxPreview({
   patient: Patient;
   vitals: Vitals;
   complaints: string[];
+  notes: string;
   diagnoses: string[];
   medicines: PrescriptionMedicine[];
   investigations: string[];
   advice: string[];
   followUpDate: string;
   letterhead: boolean;
-  rxSettings: PrescriptionTemplate;
+  design: RxDesign;
 }) {
+  const accentColor = design.accentColor;
   const vitalBits = [
     vitals.bp && `BP ${vitals.bp}`,
     vitals.pulse && `Pulse ${vitals.pulse}`,
@@ -897,12 +962,97 @@ function RxPreview({
     vitals.spo2 && `SpO₂ ${vitals.spo2}%`,
   ].filter(Boolean);
 
+  const sections = design.sections.filter((s) => s.visible).map((s) => {
+    switch (s.key) {
+      case "vitals":
+        return vitalBits.length > 0 ? (
+          <p key={s.key} className="py-2 text-xs text-muted-foreground">{vitalBits.join(" · ")}</p>
+        ) : null;
+      case "symptoms":
+        return complaints.length > 0 || notes.trim() ? (
+          <div key={s.key} className="py-2">
+            {complaints.length > 0 && (
+              <>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Complaints</p>
+                <p>{complaints.join(", ")}</p>
+              </>
+            )}
+            {notes.trim() && (
+              <>
+                <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Examination / History</p>
+                <p className="whitespace-pre-wrap text-xs">{notes}</p>
+              </>
+            )}
+          </div>
+        ) : null;
+      case "diagnosis":
+        return diagnoses.length > 0 ? (
+          <div key={s.key} className="py-2">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Diagnosis</p>
+            <p style={{ color: accentColor, fontWeight: 600 }}>{diagnoses.join(", ")}</p>
+          </div>
+        ) : null;
+      case "medicines":
+        return (
+          <div key={s.key} className="py-2">
+            <p className="mb-1 font-serif text-lg font-bold italic" style={{ color: accentColor }}>℞</p>
+            {medicines.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No medicines added.</p>
+            ) : (
+              <ol className="space-y-1.5">
+                {medicines.map((m, i) => (
+                  <li key={i} className="text-xs">
+                    <span className="font-medium">{i + 1}. {m.name}</span>
+                    {m.dosage ? ` — ${m.dosage}` : ""}
+                    <span className="text-muted-foreground">
+                      {" "}
+                      {[m.frequency, m.timing, m.durationDays ? `${m.durationDays} days` : null]
+                        .filter(Boolean)
+                        .join(" · ")}
+                      {m.instructions ? ` · ${m.instructions}` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        );
+      case "investigations":
+        return investigations.length > 0 ? (
+          <div key={s.key} className="py-2">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Investigations</p>
+            <p className="text-xs">{investigations.join(", ")}</p>
+          </div>
+        ) : null;
+      case "advice":
+        return advice.length > 0 ? (
+          <div key={s.key} className="py-2">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Advice</p>
+            <ul className="list-inside list-disc text-xs">
+              {advice.map((a) => (
+                <li key={a}>{a}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null;
+      case "followUp":
+        return followUpDate ? (
+          <p key={s.key} className="py-2 text-xs">
+            <span className="text-muted-foreground">Follow-up: </span>
+            <span className="font-medium" style={{ color: accentColor }}>{formatDate(followUpDate)}</span>
+          </p>
+        ) : null;
+      default:
+        return null;
+    }
+  });
+
   return (
-    <div className="rounded-xl border bg-card p-4 text-[13px] shadow-sm">
+    <div className="rounded-xl border bg-card p-4 text-[13px] shadow-sm" style={{ borderTop: `3px solid ${accentColor}` }}>
       {letterhead ? (
         <div className="flex items-start justify-between gap-3 border-b pb-3">
           <div>
-            <p className="text-base font-bold text-primary">{clinic.name}</p>
+            <p className="text-base font-bold" style={{ color: accentColor }}>{clinic.name}</p>
             <p className="text-xs text-muted-foreground">{clinic.address}</p>
             <p className="text-xs text-muted-foreground">{clinic.phone}</p>
           </div>
@@ -924,74 +1074,10 @@ function RxPreview({
         <span><span className="text-muted-foreground">Date: </span>{formatDate(new Date())}</span>
       </div>
 
-      {rxSettings.showVitals && vitalBits.length > 0 && (
-        <p className="border-b py-2 text-xs text-muted-foreground">{vitalBits.join(" · ")}</p>
-      )}
-
-      {complaints.length > 0 && (
-        <div className="border-b py-2">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Complaints</p>
-          <p>{complaints.join(", ")}</p>
-        </div>
-      )}
-
-      {diagnoses.length > 0 && (
-        <div className="border-b py-2">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Diagnosis</p>
-          <p>{diagnoses.join(", ")}</p>
-        </div>
-      )}
-
-      <div className="py-2">
-        <p className="mb-1 font-serif text-lg font-bold italic">℞</p>
-        {medicines.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No medicines added.</p>
-        ) : (
-          <ol className="space-y-1.5">
-            {medicines.map((m, i) => (
-              <li key={i} className="text-xs">
-                <span className="font-medium">{i + 1}. {m.name}</span>
-                {m.dosage ? ` — ${m.dosage}` : ""}
-                <span className="text-muted-foreground">
-                  {" "}
-                  {[m.frequency, m.timing, m.durationDays ? `${m.durationDays} days` : null]
-                    .filter(Boolean)
-                    .join(" · ")}
-                  {m.instructions ? ` · ${m.instructions}` : ""}
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
-
-      {investigations.length > 0 && (
-        <div className="border-t py-2">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Investigations</p>
-          <p className="text-xs">{investigations.join(", ")}</p>
-        </div>
-      )}
-
-      {advice.length > 0 && (
-        <div className="border-t py-2">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Advice</p>
-          <ul className="list-inside list-disc text-xs">
-            {advice.map((a) => (
-              <li key={a}>{a}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {followUpDate && (
-        <p className="border-t py-2 text-xs">
-          <span className="text-muted-foreground">Follow-up: </span>
-          <span className="font-medium">{formatDate(followUpDate)}</span>
-        </p>
-      )}
+      <div className="divide-y">{sections}</div>
 
       <div className="flex items-end justify-between border-t pt-3">
-        <p className="max-w-[55%] text-[10px] text-muted-foreground">{rxSettings.footerNote}</p>
+        <p className="max-w-[55%] text-[10px] text-muted-foreground">{design.footerNote}</p>
         <div className="text-center">
           <div className="mb-1 h-8 w-28 border-b" />
           <p className="text-[11px] font-medium">{doctorName}</p>

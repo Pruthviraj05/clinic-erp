@@ -29,6 +29,7 @@ import { prescriptionTemplate } from "@/server/demo/settings-store";
 import type { RxTemplate } from "@/server/demo/template-store";
 import type { DiseaseGroup } from "@/server/demo/disease-store";
 import type { RxDesign } from "@/server/demo/rx-design-store";
+import type { BillDesign } from "@/server/demo/bill-design-store";
 import type { UserAccount } from "@/server/demo/users-store";
 import type { AuditRow } from "@/server/demo/extra";
 import type {
@@ -606,6 +607,7 @@ const usersRows: UserAccount[] = [ADMIN_SEED_USER, ...SEED_LOGIN_ACCOUNTS];
 const rxTemplatesRows: RxTemplate[] = [...SEED_RX_TEMPLATES];
 const diseaseGroupsRows: DiseaseGroup[] = [];
 const rxDesignsRows: (RxDesign & { id: string })[] = [];
+const billDesignsRows: (BillDesign & { id: string })[] = [];
 
 const settingsStore: SingletonStore<typeof prescriptionTemplate> = {
   async get() {
@@ -647,6 +649,7 @@ export const demoAdapter: StoragePort = {
   users: arrayStore(usersRows),
   rxTemplates: arrayStore(rxTemplatesRows),
   rxDesigns: arrayStore(rxDesignsRows),
+  billDesigns: arrayStore(billDesignsRows),
   diseaseGroups: arrayStore(diseaseGroupsRows),
   masters,
   settings: settingsStore,

@@ -1,13 +1,14 @@
 import { z } from "zod";
-import { appointmentStatuses, appointmentTypes } from "./constants";
+import { appointmentStatuses, appointmentTypes, bookingSources } from "./constants";
 
-export { appointmentStatuses, appointmentTypes };
+export { appointmentStatuses, appointmentTypes, bookingSources };
 
 export const createAppointmentSchema = z.object({
   branchId: z.string().min(1, "Select a branch"),
   patientId: z.string().min(1, "Select a patient"),
   doctorId: z.string().min(1, "Select a doctor"),
   type: z.enum(appointmentTypes).default("SCHEDULED"),
+  source: z.enum(bookingSources).default("WALK_IN"),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date"),
   time: z.string().regex(/^\d{2}:\d{2}$/, "Pick a time"),
   durationMinutes: z.coerce.number().int().min(5).max(240).default(15),

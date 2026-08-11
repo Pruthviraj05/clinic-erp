@@ -8,17 +8,29 @@ import { RecordPaymentDialog } from "./record-payment-dialog";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { Invoice } from "@/types/domain";
 import type { ClinicInfo } from "@/features/prescriptions/prescription-detail";
+import type { BillDesign } from "@/server/demo/bill-design-store";
 
-/** Printable GST invoice. Same print-isolation approach as prescriptions. */
+const DEFAULT_DESIGN: BillDesign = {
+  kind: "CONSULTATION",
+  documentTitle: "TAX INVOICE",
+  headerNote: "",
+  footerNote: "This is a computer-generated invoice.",
+  accentColor: "#0f766e",
+};
+
+/** Printable bill — pharmacy bill or payment invoice, each with its own admin-set letterhead. */
 export function InvoiceDetail({
   invoice: inv,
   clinic,
+  design = DEFAULT_DESIGN,
   canCollect = false,
 }: {
   invoice: Invoice;
   clinic: ClinicInfo;
+  design?: BillDesign;
   canCollect?: boolean;
 }) {
+  const accentColor = design.accentColor;
   return (
     <div className="space-y-4">
       <div className="print-hide flex flex-wrap items-center justify-end gap-2">
@@ -36,14 +48,20 @@ export function InvoiceDetail({
         </Button>
       </div>
 
-      <div className="print-area mx-auto max-w-3xl rounded-xl border bg-card p-4 shadow-sm sm:p-8">
+      <div
+        className="print-area mx-auto max-w-3xl rounded-xl border bg-card p-4 shadow-sm sm:p-8"
+        style={{ borderTop: `4px solid ${accentColor}` }}
+      >
         <div className="flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+            <div
+              className="flex size-12 items-center justify-center rounded-xl text-white"
+              style={{ background: accentColor }}
+            >
               <Activity className="size-6" />
             </div>
             <div>
-              <h1 className="text-xl font-bold">{clinic.name}</h1>
+              <h1 className="text-xl font-bold" style={{ color: accentColor }}>{clinic.name}</h1>
               <p className="text-sm text-muted-foreground">{clinic.address}</p>
               <p className="text-sm text-muted-foreground">
                 {clinic.phone}{clinic.gst ? ` · GSTIN: ${clinic.gst}` : ""}
@@ -51,11 +69,20 @@ export function InvoiceDetail({
             </div>
           </div>
           <div className="text-right">
-            <p className="text-lg font-bold">TAX INVOICE</p>
+            <p className="text-lg font-bold" style={{ color: accentColor }}>{design.documentTitle}</p>
             <p className="text-sm font-medium">{inv.number}</p>
             <p className="text-xs text-muted-foreground">{formatDate(inv.createdAt)}</p>
           </div>
         </div>
+
+        {design.headerNote ? (
+          <p
+            className="mt-3 rounded-md px-3 py-1.5 text-center text-xs"
+            style={{ background: `${accentColor}12`, color: accentColor }}
+          >
+            {design.headerNote}
+          </p>
+        ) : null}
 
         <div className="flex items-center justify-between border-b py-4">
           <div>
@@ -104,7 +131,7 @@ export function InvoiceDetail({
         </div>
 
         <p className="mt-6 border-t pt-4 text-center text-[11px] text-muted-foreground">
-          This is a computer-generated invoice. Thank you for choosing {clinic.name}.
+          {design.footerNote}
         </p>
       </div>
     </div>

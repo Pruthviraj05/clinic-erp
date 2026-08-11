@@ -33,6 +33,8 @@ export async function createAppointmentAction(
   // Patients may only book for themselves, whatever the posted patientId says.
   if (user.role === "PATIENT" && user.linkId) {
     input.patientId = user.linkId;
+    // A patient can only ever be booking through the portal, whatever the form said.
+    input.source = "WEBSITE";
   }
 
   const [patient, doctor, branch] = await Promise.all([
@@ -74,6 +76,7 @@ export async function createAppointmentAction(
     doctorId: doctor.id,
     doctorName: doctor.fullName,
     type: input.type,
+    source: input.source,
     status: input.type === "WALK_IN" ? "CHECKED_IN" : "SCHEDULED",
     scheduledStart: start.toISOString(),
     scheduledEnd: end.toISOString(),

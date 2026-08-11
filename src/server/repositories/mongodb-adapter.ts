@@ -246,6 +246,7 @@ export const mongodbAdapter: StoragePort = {
   users: mongoStore("users"),
   rxTemplates: mongoStore("rx_templates"),
   rxDesigns: mongoStore("rx_designs"),
+  billDesigns: mongoStore("bill_designs"),
   diseaseGroups: mongoStore("disease_groups"),
   masters: Object.fromEntries(MASTER_GROUP_KEYS.map((g) => [g, mastersStoreFor(g)])),
   settings: settingsStore,

@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/guard";
 import { getPrescription, listPrescriptions } from "@/server/services/prescriptions.service";
 import { db } from "@/server/repositories";
 import { getRxTemplatesFor } from "@/server/demo/template-store";
+import { getRxDesignFor } from "@/server/demo/rx-design-store";
 import { groupsForDoctor } from "@/server/demo/disease-store";
 import { labTests, investigations as investigationMaster } from "@/server/demo/extra";
 import { clinicFromBranch } from "@/lib/clinic";
@@ -53,11 +54,12 @@ export default async function EditPrescriptionPage({ params }: { params: Promise
     paymentStatus: "PAID",
   };
 
-  const [history, doctor, templates, medicines] = await Promise.all([
+  const [history, doctor, templates, medicines, rxDesign] = await Promise.all([
     listPrescriptions(user, patient.id).then((rows) => rows.filter((p) => p.id !== rx.id)),
     db.doctors.get(rx.doctorId),
     getRxTemplatesFor(user.linkId ?? user.id),
     db.medicines.list(),
+    getRxDesignFor(user.linkId ?? rx.doctorId, rx.branchId),
   ]);
   const doctorMeta = [doctor?.qualifications, doctor?.registrationNo ? `Reg. ${doctor.registrationNo}` : null]
     .filter(Boolean)
@@ -90,7 +92,7 @@ export default async function EditPrescriptionPage({ params }: { params: Promise
         investigationSuggestions={investigationSuggestions}
         clinic={clinic}
         doctorMeta={doctorMeta || undefined}
-        rxSettings={await db.settings.get()}
+        rxDesign={rxDesign}
         diseaseGroups={diseaseGroups.map((g) => ({
           id: g.id,
           name: g.name,

@@ -12,6 +12,9 @@ export type AppointmentType =
   | "FOLLOW_UP"
   | "EMERGENCY";
 
+/** How the appointment was booked — distinct from `type`, which is the consultation kind. */
+export type BookingSource = "PHONE" | "WALK_IN" | "WEBSITE" | "REFERRAL";
+
 export type AppointmentStatus =
   | "SCHEDULED"
   | "CONFIRMED"
@@ -51,6 +54,7 @@ export interface Doctor {
   fullName: string;
   email: string;
   avatarUrl?: string;
+  phone?: string;
   specialization: string | null;
   department: string | null;
   registrationNo: string | null;
@@ -65,6 +69,7 @@ export interface Receptionist {
   userId: string;
   fullName: string;
   email: string;
+  phone?: string;
   branchId: string;
   employeeCode: string | null;
   isActive: boolean;
@@ -100,6 +105,8 @@ export interface Appointment {
   doctorName: string;
   type: AppointmentType;
   status: AppointmentStatus;
+  /** How this appointment was booked. Optional so pre-existing rows without it still typecheck. */
+  source?: BookingSource;
   scheduledStart: string;
   scheduledEnd: string;
   tokenNumber: number | null;
@@ -153,6 +160,8 @@ export interface Invoice {
   branchId: string;
   patientId: string;
   patientName: string;
+  /** Which letterhead this prints with. Optional: older rows default to CONSULTATION. */
+  invoiceKind?: "PHARMACY" | "CONSULTATION";
   status: InvoiceStatus;
   paymentStatus: PaymentStatus;
   items: InvoiceItem[];

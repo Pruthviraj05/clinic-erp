@@ -87,6 +87,9 @@ const ADMIN_NAV: NavSection[] = [
   },
 ];
 
+// Ordered most- to least-used in a typical clinic day: the consult queue and
+// today's patients come first, admin-y/occasional screens (design, roster)
+// sink to the bottom.
 const DOCTOR_NAV: NavSection[] = [
   {
     title: "Workspace",
@@ -95,13 +98,13 @@ const DOCTOR_NAV: NavSection[] = [
       { label: "Consult", href: "/doctor/consult", icon: Stethoscope },
       { label: "Appointments", href: "/doctor/appointments", icon: CalendarDays },
       { label: "My Patients", href: "/doctor/patients", icon: Users },
-      { label: "Disease Lists", href: "/doctor/diseases", icon: FolderHeart },
       { label: "Prescriptions", href: "/doctor/prescriptions", icon: FileText },
-      { label: "Rx Design", href: "/doctor/rx-design", icon: Palette },
       { label: "Consent Forms", href: "/doctor/consent", icon: FileSignature },
       { label: "Calendar", href: "/doctor/calendar", icon: CalendarRange },
-      { label: "Roster & Leave", href: "/doctor/roster", icon: CalendarOff },
       { label: "Notifications", href: "/doctor/notifications", icon: Bell },
+      { label: "Disease Lists", href: "/doctor/diseases", icon: FolderHeart },
+      { label: "Rx Design", href: "/doctor/rx-design", icon: Palette },
+      { label: "Roster & Leave", href: "/doctor/roster", icon: CalendarOff },
     ],
   },
 ];
@@ -114,9 +117,9 @@ const RECEPTION_NAV: NavSection[] = [
       { label: "Appointments", href: "/reception/appointments", icon: CalendarDays },
       { label: "Patients", href: "/reception/patients", icon: Users },
       { label: "Billing", href: "/reception/billing", icon: Receipt },
-      { label: "Inventory", href: "/reception/inventory", icon: Package },
       { label: "Consent Forms", href: "/reception/consent", icon: FileSignature },
       { label: "Calendar", href: "/reception/calendar", icon: CalendarRange },
+      { label: "Inventory", href: "/reception/inventory", icon: Package },
       { label: "Notifications", href: "/reception/notifications", icon: Bell },
     ],
   },

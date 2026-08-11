@@ -19,6 +19,7 @@ import type {
 } from "@/server/demo/extra";
 import type { RxTemplate } from "@/server/demo/template-store";
 import type { RxDesign } from "@/server/demo/rx-design-store";
+import type { BillDesign } from "@/server/demo/bill-design-store";
 import type { DiseaseGroup } from "@/server/demo/disease-store";
 import type { UserAccount } from "@/server/demo/users-store";
 import type { NotificationItem } from "@/types/domain";
@@ -114,6 +115,7 @@ export interface StoragePort {
   users: EntityStore<UserAccount>;
   rxTemplates: EntityStore<RxTemplate>;
   rxDesigns: EntityStore<RxDesign & { id: string }>;
+  billDesigns: EntityStore<BillDesign & { id: string }>;
   diseaseGroups: EntityStore<DiseaseGroup>;
   /** Masters keyed by group ("departments", "lab-tests", …). */
   masters: Record<string, EntityStore<MasterRow>>;

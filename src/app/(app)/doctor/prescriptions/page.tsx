@@ -12,7 +12,7 @@ export default async function DoctorPrescriptionsPage() {
   return (
     <div>
       <PageHeader title="Prescriptions" description="Prescriptions you have written." />
-      <PrescriptionsView prescriptions={prescriptions} basePath="/doctor/prescriptions" />
+      <PrescriptionsView prescriptions={prescriptions} basePath="/doctor/prescriptions" showDoctorColumn={false} />
     </div>
   );
 }

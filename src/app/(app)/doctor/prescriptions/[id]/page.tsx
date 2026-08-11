@@ -32,7 +32,7 @@ export default async function DoctorPrescriptionDetailPage({ params }: { params:
         headerNote={design.headerNote}
         footerNote={design.footerNote}
         showQr={design.showQr}
-        showVitals={design.showVitals}
+        sections={design.sections}
         accentColor={design.accentColor}
         language={design.language}
         editHref={`/doctor/prescriptions/${rx.id}/edit`}

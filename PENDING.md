@@ -369,6 +369,78 @@ form (Edit → Save) backfills it. If there turn out to be many, say so and a
 one-off backfill script (like `scripts/backfill-batches.mjs` for inventory)
 is quick to add.
 
+## 4e. UI/UX and workflow pass (appointments, calendar, reports, consult, Rx design, billing)
+
+A large batch of usability fixes and a few real features, prompted by direct
+walkthrough feedback.
+
+- **Appointment source tracking.** Booking now records how it happened —
+  Walk-in, Phone, Website/Portal or Referral — shown as its own column,
+  separate from appointment *type* (which is the consultation kind, not the
+  booking channel). Existing rows with no source display as "Walk-in", since
+  that's what they were before this field existed. Portal self-bookings are
+  always stamped Website server-side, regardless of what the form posts.
+- **Calendar is no longer read-only.** Admin and reception can click any day
+  to open the booking dialog prefilled with that date (doctors still can't
+  book — they never had that permission). Previously the calendar only ever
+  displayed appointments; booking only happened from a separate page.
+- **Reports actually work now.** Every "PDF / Excel / CSV" button used to
+  fire a toast and export nothing. Each of the 6 reports now opens a real,
+  filterable data view (date range, plus branch or doctor where relevant)
+  built from live invoices/appointments/patients/stock-movement data, and
+  export produces exactly the filtered rows you're looking at — Excel via
+  the existing `xlsx` pipeline, CSV via a small dependency-free encoder, PDF
+  via the browser's print dialog (same mechanism prescriptions and invoices
+  already use).
+- **Dashboard card alignment fixed.** Stat cards with a footer (e.g. the
+  New/Follow-up breakdown) and cards without one now line up on the same
+  baseline instead of the shorter cards trailing off unevenly mid-row.
+- **Consult templates are now toggleable.** A Quick Start chip highlights
+  once applied and double-clicking it removes exactly what it added —
+  tracked per template so removing one never touches a diagnosis, medicine
+  or advice line another still-active template also needs, or something the
+  doctor typed by hand. The exam/history notes field is now also reflected
+  in the live preview — it was captured but silently never shown.
+- **Doctor's prescription list drops the redundant "Doctor" column** (every
+  row is already them) and gains date-range + patient filters and a real
+  export; confirmed the underlying scoping was already correct — a doctor
+  only ever sees their own prescriptions, that part wasn't a bug.
+- **Disease lists can be created from the list page itself now**, not only
+  mid-consult — a "New list" button wired to the same action.
+- **Sidebar reordered** per role so the screens used every day (queue,
+  consult, billing) sit above the ones used occasionally (design, roster,
+  audit).
+- **A profile page exists now** (`/profile`, linked from the previously dead
+  "Profile" menu item). Every role can update their name (except patients —
+  that's a front-desk change, not self-service) and phone; a doctor also
+  edits qualifications and registration number here, which is the same data
+  the Rx and consent letterheads already read live — so this is the actual
+  place to fix "Dr. X, MBBS" text, not a separate settings screen.
+- **Prescription design is now a structured, reorderable letterhead
+  builder** — not just header/footer/colour/language. Seven content blocks
+  (vitals, symptoms, diagnosis, medicines, investigations, advice, follow-up)
+  can be reordered and individually shown or hidden; the letterhead, patient
+  bar and signature stay fixed at the top/bottom since no real prescription
+  wants those moved. A doctor working at more than one branch can save a
+  branch-specific override that beats their default only at that branch. The
+  live preview during a consultation now renders from this same design
+  (previously it used the generic clinic-wide template and never matched
+  what actually printed).
+- **Pharmacy bills and payment invoices are now separately designable.**
+  Both used to be one generic, unbranded "TAX INVOICE" template regardless
+  of which kind of transaction it was. Admins now set an independent
+  document title, header note, footer note and accent colour for each, under
+  Settings → Billing; invoices remember which kind they are
+  (`invoiceKind`) so the right letterhead is picked automatically. Older
+  invoices with no stamped kind default to the payment-invoice design.
+
+**Not done, flagged rather than guessed at:** a true free-form drag-and-drop
+canvas for Rx design was considered and deliberately not built — a
+structured up/down/show-hide builder can't produce a broken print layout,
+a drag-and-drop canvas can (overlapping elements, content that doesn't fit
+its box). If pixel-level layout control turns out to matter, that's a
+separate, much larger effort.
+
 ## 5. Performance and scale
 
 ### Done this session

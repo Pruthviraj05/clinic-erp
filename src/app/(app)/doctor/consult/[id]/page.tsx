@@ -7,6 +7,7 @@ import { getAppointment } from "@/server/services/appointments.service";
 import { listPrescriptions } from "@/server/services/prescriptions.service";
 import { db } from "@/server/repositories";
 import { getRxTemplatesFor } from "@/server/demo/template-store";
+import { getRxDesignFor } from "@/server/demo/rx-design-store";
 import { groupsForDoctor } from "@/server/demo/disease-store";
 import { labTests, investigations as investigationMaster } from "@/server/demo/extra";
 import { clinicFromBranch } from "@/lib/clinic";
@@ -25,12 +26,12 @@ export default async function DoctorConsultPage({ params }: { params: Promise<{ 
   const patient = await db.patients.get(appointment.patientId);
   if (!patient) notFound();
 
-  const [history, doctor, templates, medicines, prescriptionTemplate, diseaseGroups, clinic] = await Promise.all([
+  const [history, doctor, templates, medicines, rxDesign, diseaseGroups, clinic] = await Promise.all([
     listPrescriptions(user, patient.id),
     db.doctors.get(appointment.doctorId),
     getRxTemplatesFor(user.linkId ?? appointment.doctorId),
     db.medicines.list(),
-    db.settings.get(),
+    getRxDesignFor(user.linkId ?? appointment.doctorId, appointment.branchId),
     groupsForDoctor(appointment.doctorId),
     clinicFromBranch(appointment.branchId),
   ]);
@@ -64,7 +65,7 @@ export default async function DoctorConsultPage({ params }: { params: Promise<{ 
         investigationSuggestions={investigationSuggestions}
         clinic={clinic}
         doctorMeta={doctorMeta || undefined}
-        rxSettings={prescriptionTemplate}
+        rxDesign={rxDesign}
         diseaseGroups={diseaseGroups.map((g) => ({
           id: g.id,
           name: g.name,

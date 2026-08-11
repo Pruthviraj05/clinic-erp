@@ -35,45 +35,51 @@ export function StatCard({
   const up = (trend ?? 0) >= 0;
 
   return (
-    <Card className="p-5">
+    <Card className="flex h-full flex-col p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1.5">
           <p className="text-sm font-medium text-muted-foreground">{label}</p>
           <p className="text-2xl font-semibold tracking-tight">{value}</p>
         </div>
-        <div className={cn("flex size-10 items-center justify-center rounded-xl", ACCENT[accent])}>
+        <div className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", ACCENT[accent])}>
           <Icon className="size-5" />
         </div>
       </div>
-      {(hasTrend || hint) && (
-        <div className="mt-3 flex items-center gap-2 text-xs">
-          {hasTrend && (
-            <span
-              className={cn(
-                "inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 font-medium",
-                up ? "bg-[var(--success)]/12 text-[var(--success)]" : "bg-destructive/10 text-destructive",
-              )}
-            >
-              {up ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
-              {Math.abs(trend!)}%
-            </span>
-          )}
-          {hint ? <span className="text-muted-foreground">{hint}</span> : null}
-        </div>
-      )}
-      {breakdown && breakdown.length > 0 && (
-        <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3 text-xs">
-          {breakdown.map((b) => (
-            <span
-              key={b.label}
-              className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 font-medium text-muted-foreground"
-            >
-              {b.label}
-              <span className="font-semibold text-foreground">{b.value}</span>
-            </span>
-          ))}
-        </div>
-      )}
+      {/* Footer content (trend/hint/breakdown) is pinned to the bottom, so
+          every card in a row lines up on the same baseline whether or not it
+          has one — instead of shorter cards ending with unused whitespace
+          part-way up while a taller sibling's footer sits lower. */}
+      <div className="mt-auto">
+        {(hasTrend || hint) && (
+          <div className="mt-3 flex items-center gap-2 text-xs">
+            {hasTrend && (
+              <span
+                className={cn(
+                  "inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 font-medium",
+                  up ? "bg-[var(--success)]/12 text-[var(--success)]" : "bg-destructive/10 text-destructive",
+                )}
+              >
+                {up ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
+                {Math.abs(trend!)}%
+              </span>
+            )}
+            {hint ? <span className="text-muted-foreground">{hint}</span> : null}
+          </div>
+        )}
+        {breakdown && breakdown.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3 text-xs">
+            {breakdown.map((b) => (
+              <span
+                key={b.label}
+                className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 font-medium text-muted-foreground"
+              >
+                {b.label}
+                <span className="font-semibold text-foreground">{b.value}</span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
     </Card>
   );
 }
